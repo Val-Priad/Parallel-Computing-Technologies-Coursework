@@ -27,5 +27,5 @@ func main() {
 	fmt.Println("Best cost:", solution.Cost)
 	fmt.Println("Routes:", solution.Routes)
 
-	logger.SaveToFile("log.json")
+	logger.SaveToFile("log.json", points)
 }

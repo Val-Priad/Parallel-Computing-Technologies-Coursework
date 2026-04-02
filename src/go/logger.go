@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -9,6 +10,11 @@ type Step struct {
 	StepID int     `json:"step_id"`
 	Routes [][]int `json:"routes"`
 	Cost   float64 `json:"cost"`
+}
+
+type LogOutput struct {
+	Points map[string][]float64 `json:"points"`
+	Steps  []Step               `json:"steps"`
 }
 
 type Logger struct {
@@ -29,7 +35,7 @@ func (l *Logger) Log(step Step) {
 	l.Steps = append(l.Steps, step)
 }
 
-func (l *Logger) SaveToFile(filename string) error {
+func (l *Logger) SaveToFile(filename string, points []Point) error {
 	if !l.Enabled {
 		return nil
 	}
@@ -40,7 +46,17 @@ func (l *Logger) SaveToFile(filename string) error {
 	}
 	defer file.Close()
 
+	pointsMap := make(map[string][]float64, len(points))
+	for _, p := range points {
+		pointsMap[fmt.Sprintf("%d", p.ID)] = []float64{p.X, p.Y}
+	}
+
+	output := LogOutput{
+		Points: pointsMap,
+		Steps:  l.Steps,
+	}
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(l.Steps)
+	return encoder.Encode(output)
 }
