@@ -93,11 +93,29 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 		return Solution{Routes: []Route{}, Cost: 0}
 	}
 
-	best := Solution{Cost: math.Inf(1)}
+	best := Solution{Cost: math.Inf(1), Routes: []Route{}}
 	checkedSolutions := 0
+	dist := instance.Dist
+	routeEnds := make([]int, k)
 
-	var search func(vehicleIdx, start int, currentCost float64, routes []Route)
-	search = func(vehicleIdx, start int, currentCost float64, routes []Route) {
+	var buildRoutesFromEnds = func() []Route {
+		routes := make([]Route, k)
+		segmentStart := 0
+		for i := 0; i < k; i++ {
+			segmentEnd := routeEnds[i]
+			nodes := make([]int, segmentEnd-segmentStart)
+			copy(nodes, order[segmentStart:segmentEnd])
+			routes[i] = Route{
+				VehicleID: i,
+				Nodes:     nodes,
+			}
+			segmentStart = segmentEnd
+		}
+		return routes
+	}
+
+	var search func(vehicleIdx, start int, currentCost float64)
+	search = func(vehicleIdx, start int, currentCost float64) {
 		if currentCost >= best.Cost {
 			return
 		}
@@ -105,29 +123,22 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 		if vehicleIdx == k {
 			if start == n {
 				checkedSolutions++
-				candidate := Solution{
-					Routes: cloneRoutes(routes),
-					Cost:   currentCost,
-				}
-				if candidate.Cost < best.Cost {
-					best = candidate
+				if currentCost < best.Cost {
+					best.Cost = currentCost
+					best.Routes = buildRoutesFromEnds()
 				}
 			}
 			return
 		}
 
 		if start >= n {
-			finalRoutes := cloneRoutes(routes)
 			for i := vehicleIdx; i < k; i++ {
-				finalRoutes = append(finalRoutes, Route{VehicleID: i, Nodes: []int{}})
+				routeEnds[i] = start
 			}
 			checkedSolutions++
-			candidate := Solution{
-				Routes: finalRoutes,
-				Cost:   currentCost,
-			}
-			if candidate.Cost < best.Cost {
-				best = candidate
+			if currentCost < best.Cost {
+				best.Cost = currentCost
+				best.Routes = buildRoutesFromEnds()
 			}
 			return
 		}
@@ -139,18 +150,25 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 			maxEnd = n - (remainingVehicles - 1)
 		}
 
+		prevNode := 0
+		routeCostWithoutReturn := 0.0
 		for end := start + 1; end <= maxEnd; end++ {
-			nodes := append([]int{}, order[start:end]...)
-			routeCost := RouteCost(instance, nodes)
-			nextRoutes := append(cloneRoutes(routes), Route{
-				VehicleID: vehicleIdx,
-				Nodes:     nodes,
-			})
-			search(vehicleIdx+1, end, currentCost+routeCost, nextRoutes)
+			node := order[end-1]
+			routeCostWithoutReturn += dist[prevNode][node]
+			prevNode = node
+
+			routeCost := routeCostWithoutReturn + dist[prevNode][0]
+			nextCost := currentCost + routeCost
+			if nextCost >= best.Cost {
+				continue
+			}
+
+			routeEnds[vehicleIdx] = end
+			search(vehicleIdx+1, end, nextCost)
 		}
 	}
 
-	search(0, 0, 0, []Route{})
+	search(0, 0, 0)
 
 	if math.IsInf(best.Cost, 1) {
 		best = Solution{Routes: []Route{}, Cost: 0}
@@ -158,36 +176,4 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 
 	best.Metrics.CheckedSolutions = checkedSolutions
 	return best
-}
-
-func cloneRoutes(routes []Route) []Route {
-	cloned := make([]Route, len(routes))
-	for i, route := range routes {
-		nodes := append([]int{}, route.Nodes...)
-		cloned[i] = Route{
-			VehicleID: route.VehicleID,
-			Nodes:     nodes,
-		}
-	}
-	return cloned
-}
-
-func RouteCost(instance VRPInstance, nodes []int) float64 {
-	if len(nodes) == 0 {
-		return 0
-	}
-
-	depot := 0
-	cost := 0.0
-
-	prev := depot
-
-	for _, node := range nodes {
-		cost += instance.Dist[prev][node]
-		prev = node
-	}
-
-	cost += instance.Dist[prev][depot]
-
-	return cost
 }
