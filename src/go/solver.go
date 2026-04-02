@@ -34,22 +34,21 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 
 		sol := Evaluate(instance, order)
 		totalChecked += sol.Metrics.CheckedSolutions
-
-		loggedRoutes := make([][]int, len(sol.Routes))
-		for i, route := range sol.Routes {
-			loggedRoutes[i] = append([]int{}, route.Nodes...)
-		}
-
-		logger.Log(Step{
-			StepID: stepID,
-			Routes: loggedRoutes,
-			Cost:   sol.Cost,
-		})
-
-		stepID++
-
 		if sol.Cost < best.Cost {
+			loggedRoutes := make([][]int, len(sol.Routes))
+			for i, route := range sol.Routes {
+				loggedRoutes[i] = append([]int{}, route.Nodes...)
+			}
+
 			best = sol
+
+			logger.Log(Step{
+				StepID: stepID,
+				Routes: loggedRoutes,
+				Cost:   sol.Cost,
+			})
+			stepID++
+
 		}
 	})
 
