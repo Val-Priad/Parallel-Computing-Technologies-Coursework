@@ -5,6 +5,21 @@ import (
 	"time"
 )
 
+type SearchCounter struct {
+	checkedSolutions int
+}
+
+func (c *SearchCounter) IncCheckedSolutions() {
+	c.checkedSolutions++
+}
+
+func (c *SearchCounter) CheckedSolutions() int {
+	if c == nil {
+		return 0
+	}
+	return c.checkedSolutions
+}
+
 func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 	n := len(instance.Customers)
 	startTime := time.Now()
@@ -23,7 +38,7 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 	}
 
 	best := Solution{Cost: math.Inf(1)}
-	totalChecked := 0
+	counter := &SearchCounter{}
 
 	stepID := 0
 
@@ -32,8 +47,7 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 		order[0] = 1
 		copy(order[1:], p)
 
-		sol := Evaluate(instance, order)
-		totalChecked += sol.Metrics.CheckedSolutions
+		sol := Evaluate(instance, order, counter)
 		if sol.Cost < best.Cost {
 			loggedRoutes := make([][]int, len(sol.Routes))
 			for i, route := range sol.Routes {
@@ -53,7 +67,7 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 	})
 
 	best.Metrics = SearchMetrics{
-		CheckedSolutions: totalChecked,
+		CheckedSolutions: counter.CheckedSolutions(),
 		DurationMS:       float64(time.Since(startTime).Microseconds()) / 1000.0,
 	}
 
@@ -86,7 +100,7 @@ func Permute(arr []int, f func([]int)) {
 	generate(len(arr))
 }
 
-func Evaluate(instance VRPInstance, order []int) Solution {
+func Evaluate(instance VRPInstance, order []int, counter *SearchCounter) Solution {
 	k := instance.Vehicles
 	n := len(order)
 	if n == 0 || k == 0 {
@@ -94,7 +108,6 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	}
 
 	best := Solution{Cost: math.Inf(1), Routes: []Route{}}
-	checkedSolutions := 0
 	dist := instance.Dist
 	routeEnds := make([]int, k)
 
@@ -122,7 +135,7 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 
 		if vehicleIdx == k {
 			if start == n {
-				checkedSolutions++
+				counter.IncCheckedSolutions()
 				if currentCost < best.Cost {
 					best.Cost = currentCost
 					best.Routes = buildRoutesFromEnds()
@@ -135,7 +148,7 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 			for i := vehicleIdx; i < k; i++ {
 				routeEnds[i] = start
 			}
-			checkedSolutions++
+			counter.IncCheckedSolutions()
 			if currentCost < best.Cost {
 				best.Cost = currentCost
 				best.Routes = buildRoutesFromEnds()
@@ -173,7 +186,5 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	if math.IsInf(best.Cost, 1) {
 		best = Solution{Routes: []Route{}, Cost: 0}
 	}
-
-	best.Metrics.CheckedSolutions = checkedSolutions
 	return best
 }
