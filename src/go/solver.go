@@ -2,22 +2,38 @@ package main
 
 import (
 	"math"
+	"time"
 )
 
 func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 	n := len(instance.Customers)
+	startTime := time.Now()
 
-	perm := make([]int, n)
-	for i := 0; i < n; i++ {
-		perm[i] = i + 1 // ID клиентов
+	if n == 0 {
+		return Solution{
+			Routes:  []Route{},
+			Cost:    0,
+			Metrics: SearchMetrics{DurationMS: float64(time.Since(startTime).Microseconds()) / 1000.0},
+		}
+	}
+
+	perm := make([]int, n-1)
+	for i := 0; i < n-1; i++ {
+		perm[i] = i + 2
 	}
 
 	best := Solution{Cost: math.Inf(1)}
+	totalChecked := 0
 
 	stepID := 0
 
 	Permute(perm, func(p []int) {
-		sol := Evaluate(instance, p)
+		order := make([]int, n)
+		order[0] = 1
+		copy(order[1:], p)
+
+		sol := Evaluate(instance, order)
+		totalChecked += sol.Metrics.CheckedSolutions
 
 		loggedRoutes := make([][]int, len(sol.Routes))
 		for i, route := range sol.Routes {
@@ -37,10 +53,20 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 		}
 	})
 
+	best.Metrics = SearchMetrics{
+		CheckedSolutions: totalChecked,
+		DurationMS:       float64(time.Since(startTime).Microseconds()) / 1000.0,
+	}
+
 	return best
 }
 
 func Permute(arr []int, f func([]int)) {
+	if len(arr) == 0 {
+		f([]int{})
+		return
+	}
+
 	var generate func(int)
 	generate = func(n int) {
 		if n == 1 {
@@ -64,37 +90,87 @@ func Permute(arr []int, f func([]int)) {
 func Evaluate(instance VRPInstance, order []int) Solution {
 	k := instance.Vehicles
 	n := len(order)
+	if n == 0 || k == 0 {
+		return Solution{Routes: []Route{}, Cost: 0}
+	}
 
-	chunkSize := int(math.Ceil(float64(n) / float64(k)))
+	best := Solution{Cost: math.Inf(1)}
+	checkedSolutions := 0
 
-	routes := []Route{}
-	totalCost := 0.0
-
-	for i := 0; i < k; i++ {
-		start := i * chunkSize
-		end := (i + 1) * chunkSize
-		if end > n {
-			end = n
+	var search func(vehicleIdx, start int, currentCost float64, routes []Route)
+	search = func(vehicleIdx, start int, currentCost float64, routes []Route) {
+		if currentCost >= best.Cost {
+			return
 		}
+
+		if vehicleIdx == k {
+			if start == n {
+				checkedSolutions++
+				candidate := Solution{
+					Routes: cloneRoutes(routes),
+					Cost:   currentCost,
+				}
+				if candidate.Cost < best.Cost {
+					best = candidate
+				}
+			}
+			return
+		}
+
 		if start >= n {
-			break
+			finalRoutes := cloneRoutes(routes)
+			for i := vehicleIdx; i < k; i++ {
+				finalRoutes = append(finalRoutes, Route{VehicleID: i, Nodes: []int{}})
+			}
+			checkedSolutions++
+			candidate := Solution{
+				Routes: finalRoutes,
+				Cost:   currentCost,
+			}
+			if candidate.Cost < best.Cost {
+				best = candidate
+			}
+			return
 		}
 
-		nodes := order[start:end]
-		cost := RouteCost(instance, nodes)
+		remainingVehicles := k - vehicleIdx
+		remainingCustomers := n - start
+		maxEnd := n
+		if remainingCustomers >= remainingVehicles {
+			maxEnd = n - (remainingVehicles - 1)
+		}
 
-		routes = append(routes, Route{
-			VehicleID: i,
+		for end := start + 1; end <= maxEnd; end++ {
+			nodes := append([]int{}, order[start:end]...)
+			routeCost := RouteCost(instance, nodes)
+			nextRoutes := append(cloneRoutes(routes), Route{
+				VehicleID: vehicleIdx,
+				Nodes:     nodes,
+			})
+			search(vehicleIdx+1, end, currentCost+routeCost, nextRoutes)
+		}
+	}
+
+	search(0, 0, 0, []Route{})
+
+	if math.IsInf(best.Cost, 1) {
+		best = Solution{Routes: []Route{}, Cost: 0}
+	}
+
+	best.Metrics.CheckedSolutions = checkedSolutions
+	return best
+}
+
+func cloneRoutes(routes []Route) []Route {
+	cloned := make([]Route, len(routes))
+	for i, route := range routes {
+		nodes := append([]int{}, route.Nodes...)
+		cloned[i] = Route{
+			VehicleID: route.VehicleID,
 			Nodes:     nodes,
-		})
-
-		totalCost += cost
+		}
 	}
-
-	return Solution{
-		Routes: routes,
-		Cost:   totalCost,
-	}
+	return cloned
 }
 
 func RouteCost(instance VRPInstance, nodes []int) float64 {

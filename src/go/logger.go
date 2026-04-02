@@ -13,8 +13,9 @@ type Step struct {
 }
 
 type LogOutput struct {
-	Points map[string][]float64 `json:"points"`
-	Steps  []Step               `json:"steps"`
+	Points  map[string][]float64 `json:"points"`
+	Steps   []Step               `json:"steps"`
+	Metrics SearchMetrics        `json:"metrics"`
 }
 
 type Logger struct {
@@ -35,7 +36,7 @@ func (l *Logger) Log(step Step) {
 	l.Steps = append(l.Steps, step)
 }
 
-func (l *Logger) SaveToFile(filename string, points []Point) error {
+func (l *Logger) SaveToFile(filename string, points []Point, metrics SearchMetrics) error {
 	if !l.Enabled {
 		return nil
 	}
@@ -52,8 +53,9 @@ func (l *Logger) SaveToFile(filename string, points []Point) error {
 	}
 
 	output := LogOutput{
-		Points: pointsMap,
-		Steps:  l.Steps,
+		Points:  pointsMap,
+		Steps:   l.Steps,
+		Metrics: metrics,
 	}
 
 	encoder := json.NewEncoder(file)

@@ -26,6 +26,8 @@ func main() {
 
 	fmt.Println("Best cost:", solution.Cost)
 	fmt.Println("Routes:", solution.Routes)
+	fmt.Println("Checked solutions:", solution.Metrics.CheckedSolutions)
+	fmt.Printf("Execution time: %.3f ms\n", solution.Metrics.DurationMS)
 
-	logger.SaveToFile("log.json", points)
+	logger.SaveToFile("log.json", points, solution.Metrics)
 }

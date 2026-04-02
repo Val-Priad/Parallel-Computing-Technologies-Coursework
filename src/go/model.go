@@ -13,12 +13,18 @@ type VRPInstance struct {
 	Dist      [][]float64
 }
 
+type SearchMetrics struct {
+	CheckedSolutions int     `json:"checked_solutions"`
+	DurationMS       float64 `json:"duration_ms"`
+}
+
 type Route struct {
 	VehicleID int
 	Nodes     []int // IDs клиентов
 }
 
 type Solution struct {
-	Routes []Route
-	Cost   float64
+	Routes  []Route
+	Cost    float64
+	Metrics SearchMetrics `json:"metrics"`
 }
