@@ -141,6 +141,9 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 		routeCostWithoutReturn := 0.0
 		for end := start; end <= n; end++ {
 			if end == start {
+				if start != 0 {
+					continue
+				}
 				routeEnds[vehicleIdx] = end
 				search(vehicleIdx+1, end, currentCost, prevFirstNode)
 				continue
@@ -157,14 +160,17 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 				continue
 			}
 
-			routeCostWithoutReturn += dist[prevNode][node]
-			prevNode = node
+			nextRouteCostWithoutReturn := routeCostWithoutReturn + dist[prevNode][node]
+			nextPrevNode := node
 
-			routeCost := routeCostWithoutReturn + dist[prevNode][0]
+			routeCost := nextRouteCostWithoutReturn + dist[nextPrevNode][0]
 			nextCost := currentCost + routeCost
 			if nextCost >= best.Cost {
 				continue
 			}
+
+			routeCostWithoutReturn = nextRouteCostWithoutReturn
+			prevNode = nextPrevNode
 
 			routeEnds[vehicleIdx] = end
 			search(vehicleIdx+1, end, nextCost, firstNode)
