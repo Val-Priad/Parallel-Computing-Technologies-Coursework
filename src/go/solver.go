@@ -193,7 +193,10 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	search(0, 0, 0, 0)
 
 	if math.IsInf(best.Cost, 1) {
-		best = Solution{Routes: []Route{}, Cost: math.Inf(1)}
+		return Solution{
+			Routes: []Route{},
+			Cost:   math.Inf(1),
+		}
 	}
 	return best
 }
