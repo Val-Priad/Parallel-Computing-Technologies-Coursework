@@ -146,6 +146,7 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 
 		prevNode := 0
 		routeCostWithoutReturn := 0.0
+		routeLoad := 0
 		for end := start; end <= n; end++ {
 			if end == start {
 				if start != 0 {
@@ -159,10 +160,7 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 			firstNode := order[start]
 			node := order[end-1]
 
-			routeLoad := 0
-			for i := start; i < end; i++ {
-				routeLoad += demandByID[order[i]]
-			}
+			routeLoad += demandByID[node]
 			if routeLoad > capacity {
 				break
 			}
