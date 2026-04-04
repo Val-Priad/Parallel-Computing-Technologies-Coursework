@@ -43,32 +43,6 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 
 	remaining := n
 
-	for v := 0; v < k && remaining > 0; v++ {
-		bestNode := -1
-		bestScore := math.Inf(1)
-
-		for _, c := range instance.Customers {
-			if c.ID < 0 || c.ID >= len(visited) || visited[c.ID] {
-				continue
-			}
-
-			delta := dist[current[v]][c.ID] + dist[c.ID][0] - dist[current[v]][0]
-			if delta < bestScore {
-				bestScore = delta
-				bestNode = c.ID
-			}
-		}
-
-		if bestNode == -1 {
-			break
-		}
-
-		routes[v].Nodes = append(routes[v].Nodes, bestNode)
-		visited[bestNode] = true
-		current[v] = bestNode
-		remaining--
-	}
-
 	for remaining > 0 {
 		bestVehicle := -1
 		bestNode := -1

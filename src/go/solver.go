@@ -137,16 +137,15 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 			return
 		}
 
-		remainingVehicles := k - vehicleIdx
-		remainingCustomers := n - start
-		maxEnd := n
-		if remainingCustomers >= remainingVehicles {
-			maxEnd = n - (remainingVehicles - 1)
-		}
-
 		prevNode := 0
 		routeCostWithoutReturn := 0.0
-		for end := start + 1; end <= maxEnd; end++ {
+		for end := start; end <= n; end++ {
+			if end == start {
+				routeEnds[vehicleIdx] = end
+				search(vehicleIdx+1, end, currentCost, prevFirstNode)
+				continue
+			}
+
 			firstNode := order[start]
 			node := order[end-1]
 
