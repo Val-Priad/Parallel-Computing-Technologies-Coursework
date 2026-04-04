@@ -5,8 +5,6 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_hex
 
-# TODO: different style for go home line
-
 DATA_FILE = (
     Path(__file__).resolve().parent.resolve().parent
     / "go"
@@ -85,13 +83,13 @@ def draw_routes(routes):
     for idx, route in enumerate(routes):
         color = route_colors[idx % len(route_colors)]
 
-        full_route = [0] + route + [0]
-        route_xs = [points[node_id][0] for node_id in full_route]
-        route_ys = [points[node_id][1] for node_id in full_route]
+        route_body = [0] + route
+        body_xs = [points[node_id][0] for node_id in route_body]
+        body_ys = [points[node_id][1] for node_id in route_body]
 
         ax.plot(
-            route_xs,
-            route_ys,
+            body_xs,
+            body_ys,
             color=color,
             linewidth=3.0,
             alpha=0.9,
@@ -100,6 +98,21 @@ def draw_routes(routes):
             label=f"Route {idx + 1}",
             zorder=2,
         )
+
+        if route:
+            return_segment = [route[-1], 0]
+            return_xs = [points[node_id][0] for node_id in return_segment]
+            return_ys = [points[node_id][1] for node_id in return_segment]
+            ax.plot(
+                return_xs,
+                return_ys,
+                color=color,
+                linewidth=3.0,
+                alpha=0.9,
+                linestyle="--",
+                label="_nolegend_",
+                zorder=2,
+            )
 
 
 def update(frame):
