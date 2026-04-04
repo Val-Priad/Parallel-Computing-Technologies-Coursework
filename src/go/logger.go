@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Step struct {
@@ -39,6 +40,12 @@ func (l *Logger) Log(step Step) {
 func (l *Logger) SaveToFile(filename string, points []Point, metrics SearchMetrics) error {
 	if !l.Enabled {
 		return nil
+	}
+
+	if dir := filepath.Dir(filename); dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
 
 	file, err := os.Create(filename)

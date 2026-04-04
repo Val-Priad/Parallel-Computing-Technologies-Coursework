@@ -14,8 +14,7 @@ type VRPInstance struct {
 }
 
 type SearchMetrics struct {
-	CheckedSolutions int     `json:"checked_solutions"`
-	DurationMS       float64 `json:"duration_ms"`
+	DurationMS float64 `json:"duration_ms"`
 }
 
 type Route struct {

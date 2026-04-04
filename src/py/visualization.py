@@ -5,7 +5,14 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_hex
 
-DATA_FILE = Path(__file__).with_name("log.json")
+# TODO: different style for go home line
+
+DATA_FILE = (
+    Path(__file__).resolve().parent.resolve().parent
+    / "go"
+    / "logs"
+    / "brute-force__vehicles-2_customers-4.json"
+)
 with DATA_FILE.open("r", encoding="utf-8") as f:
     data = json.load(f)
 

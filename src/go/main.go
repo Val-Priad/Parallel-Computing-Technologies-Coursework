@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 func main() {
 	points := []Point{
@@ -26,8 +29,23 @@ func main() {
 
 	fmt.Println("Best cost:", solution.Cost)
 	fmt.Println("Routes:", solution.Routes)
-	fmt.Println("Checked solutions:", solution.Metrics.CheckedSolutions)
 	fmt.Printf("Execution time: %.3f ms\n", solution.Metrics.DurationMS)
 
-	logger.SaveToFile("log.json", points, solution.Metrics)
+	exactLogName := filepath.Join("logs", fmt.Sprintf("brute-force__vehicles-%d_customers-%d.json", instance.Vehicles, len(instance.Customers)))
+	if err := logger.SaveToFile(exactLogName, points, solution.Metrics); err != nil {
+		fmt.Println("Failed to save exact log:", err)
+	}
+
+	greedyLogger := NewLogger(true)
+	greedySolution := SolveGreedy(instance, greedyLogger)
+
+	fmt.Println("\n--- Greedy ---")
+	fmt.Println("Cost:", greedySolution.Cost)
+	fmt.Println("Routes:", greedySolution.Routes)
+	fmt.Printf("Execution time: %.3f ms\n", greedySolution.Metrics.DurationMS)
+
+	greedyLogName := filepath.Join("logs", fmt.Sprintf("greedy__vehicles-%d_customers-%d.json", instance.Vehicles, len(instance.Customers)))
+	if err := greedyLogger.SaveToFile(greedyLogName, points, greedySolution.Metrics); err != nil {
+		fmt.Println("Failed to save greedy log:", err)
+	}
 }
