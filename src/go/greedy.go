@@ -21,6 +21,7 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 	}
 
 	dist := instance.Dist
+	capacity := instance.VehicleCapacity
 
 	maxID := 0
 	for _, customer := range instance.Customers {
@@ -30,8 +31,15 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 	}
 
 	visited := make([]bool, maxID+1)
+	demandByID := make([]int, maxID+1)
+	for _, customer := range instance.Customers {
+		if customer.ID >= 0 && customer.ID < len(demandByID) {
+			demandByID[customer.ID] = customer.Demand
+		}
+	}
 	routes := make([]Route, k)
 	current := make([]int, k)
+	currentLoad := make([]int, k)
 
 	for i := 0; i < k; i++ {
 		current[i] = 0
@@ -54,6 +62,9 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 				if c.ID < 0 || c.ID >= len(visited) || visited[c.ID] {
 					continue
 				}
+				if currentLoad[v]+demandByID[c.ID] > capacity {
+					continue
+				}
 
 				delta := dist[current[v]][c.ID] + dist[c.ID][0] - dist[current[v]][0]
 				candidateDist := dist[current[v]][c.ID]
@@ -73,6 +84,7 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 
 		routes[bestVehicle].Nodes = append(routes[bestVehicle].Nodes, bestNode)
 		visited[bestNode] = true
+		currentLoad[bestVehicle] += demandByID[bestNode]
 		current[bestVehicle] = bestNode
 		remaining--
 	}

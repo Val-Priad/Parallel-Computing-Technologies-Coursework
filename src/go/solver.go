@@ -92,6 +92,13 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 
 	best := Solution{Cost: math.Inf(1), Routes: []Route{}}
 	dist := instance.Dist
+	capacity := instance.VehicleCapacity
+	demandByID := make([]int, len(dist))
+	for _, customer := range instance.Customers {
+		if customer.ID >= 0 && customer.ID < len(demandByID) {
+			demandByID[customer.ID] = customer.Demand
+		}
+	}
 	routeEnds := make([]int, k)
 
 	var buildRoutesFromEnds = func() []Route {
@@ -152,6 +159,14 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 			firstNode := order[start]
 			node := order[end-1]
 
+			routeLoad := 0
+			for i := start; i < end; i++ {
+				routeLoad += demandByID[order[i]]
+			}
+			if routeLoad > capacity {
+				break
+			}
+
 			if end-start > 1 && firstNode > node {
 				continue
 			}
@@ -180,7 +195,7 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	search(0, 0, 0, 0)
 
 	if math.IsInf(best.Cost, 1) {
-		best = Solution{Routes: []Route{}, Cost: 0}
+		best = Solution{Routes: []Route{}, Cost: math.Inf(1)}
 	}
 	return best
 }
