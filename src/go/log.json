@@ -48,11 +48,11 @@
           4
         ]
       ],
-      "cost": 26.790919892131257
+      "cost": 26.731294888998256
     }
   ],
   "metrics": {
-    "checked_solutions": 6,
-    "duration_ms": 0
+    "checked_solutions": 7,
+    "duration_ms": 0.535
   }
 }

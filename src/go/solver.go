@@ -127,8 +127,8 @@ func Evaluate(instance VRPInstance, order []int, counter *SearchCounter) Solutio
 		return routes
 	}
 
-	var search func(vehicleIdx, start int, currentCost float64)
-	search = func(vehicleIdx, start int, currentCost float64) {
+	var search func(vehicleIdx, start int, currentCost float64, prevFirstNode int)
+	search = func(vehicleIdx, start int, currentCost float64, prevFirstNode int) {
 		if currentCost >= best.Cost {
 			return
 		}
@@ -166,7 +166,17 @@ func Evaluate(instance VRPInstance, order []int, counter *SearchCounter) Solutio
 		prevNode := 0
 		routeCostWithoutReturn := 0.0
 		for end := start + 1; end <= maxEnd; end++ {
+			firstNode := order[start]
 			node := order[end-1]
+
+			if end-start > 1 && firstNode > node {
+				continue
+			}
+
+			if prevFirstNode != 0 && firstNode < prevFirstNode {
+				continue
+			}
+
 			routeCostWithoutReturn += dist[prevNode][node]
 			prevNode = node
 
@@ -177,11 +187,11 @@ func Evaluate(instance VRPInstance, order []int, counter *SearchCounter) Solutio
 			}
 
 			routeEnds[vehicleIdx] = end
-			search(vehicleIdx+1, end, nextCost)
+			search(vehicleIdx+1, end, nextCost, firstNode)
 		}
 	}
 
-	search(0, 0, 0)
+	search(0, 0, 0, 0)
 
 	if math.IsInf(best.Cost, 1) {
 		best = Solution{Routes: []Route{}, Cost: 0}
