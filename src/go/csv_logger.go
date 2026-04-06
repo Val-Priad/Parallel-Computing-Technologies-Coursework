@@ -50,7 +50,7 @@ func (c *CSVLogger) Log(
 		strconv.Itoa(len(instance.Customers)),
 		strconv.Itoa(instance.Vehicles),
 		strconv.Itoa(instance.VehicleCapacity),
-		strconv.FormatFloat(solution.Metrics.DurationMS, 'f', 3, 64),
+		strconv.FormatFloat(solution.Metrics.DurationMS, 'f', 6, 64),
 		strconv.FormatFloat(solution.Cost, 'f', 3, 64),
 		strconv.FormatBool(feasible),
 	})

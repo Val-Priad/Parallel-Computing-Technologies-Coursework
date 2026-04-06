@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 func main() {
 	experiments := GetExperiments()
@@ -13,7 +16,7 @@ func main() {
 
 	for _, exp := range experiments {
 		baseSeed := exp.Seed
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 1; i++ {
 			runSeed := baseSeed + int64(i)
 			runName := fmt.Sprintf("%s_run_%d", exp.Name, i+1)
 
@@ -28,17 +31,25 @@ func main() {
 				CapacityMode: exp.CapacityMode,
 			})
 
-			greedyLogger := NewLogger(false)
+			greedyLogger := NewLogger(true)
 			greedySolution := SolveGreedy(instance, greedyLogger)
 
 			fmt.Println("Greedy:", greedySolution.Cost)
+			greedyLogPath := filepath.Join("logs", fmt.Sprintf("%s_greedy.json", runName))
+			if err := greedyLogger.SaveToFile(greedyLogPath, instance.Customers, greedySolution.Metrics); err != nil {
+				fmt.Println("Failed to save greedy log:", err)
+			}
 
 			csvLogger.Log(runName, "greedy", instance, greedySolution)
 
-			exactLogger := NewLogger(false)
-			exactSolution := SolveVRP(instance, exactLogger)
+			bruteForceLogger := NewLogger(true)
+			exactSolution := SolveBruteForce(instance, bruteForceLogger)
 
 			fmt.Println("Brute:", exactSolution.Cost)
+			exactLogPath := filepath.Join("logs", fmt.Sprintf("%s_brute_force.json", runName))
+			if err := bruteForceLogger.SaveToFile(exactLogPath, instance.Customers, exactSolution.Metrics); err != nil {
+				fmt.Println("Failed to save brute-force log:", err)
+			}
 
 			csvLogger.Log(runName, "brute_force", instance, exactSolution)
 		}

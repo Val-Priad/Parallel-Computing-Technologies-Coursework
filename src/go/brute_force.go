@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func SolveVRP(instance VRPInstance, logger *Logger) Solution {
+func SolveBruteForce(instance VRPInstance, logger *Logger) Solution {
 	n := len(instance.Customers)
 	startTime := time.Now()
 
@@ -13,7 +13,7 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 		return Solution{
 			Routes:  []Route{},
 			Cost:    0,
-			Metrics: SearchMetrics{DurationMS: float64(time.Since(startTime).Microseconds()) / 1000.0},
+			Metrics: SearchMetrics{DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6},
 		}
 	}
 
@@ -51,7 +51,7 @@ func SolveVRP(instance VRPInstance, logger *Logger) Solution {
 	})
 
 	best.Metrics = SearchMetrics{
-		DurationMS: float64(time.Since(startTime).Microseconds()) / 1000.0,
+		DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 	}
 
 	return best

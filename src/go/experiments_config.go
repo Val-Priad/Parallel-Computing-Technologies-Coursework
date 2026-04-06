@@ -19,7 +19,7 @@ func GetExperiments() []ExperimentConfig {
 			Vehicles:     2,
 			Width:        50,
 			Height:       50,
-			CapacityMode: CapacityAuto,
+			CapacityMode: CapacityTight,
 			Seed:         42,
 		},
 
@@ -29,7 +29,7 @@ func GetExperiments() []ExperimentConfig {
 			Vehicles:     3,
 			Width:        60,
 			Height:       60,
-			CapacityMode: CapacityAuto,
+			CapacityMode: CapacityTight,
 			Seed:         43,
 		},
 
@@ -39,28 +39,27 @@ func GetExperiments() []ExperimentConfig {
 			Vehicles:     3,
 			Width:        80,
 			Height:       80,
-			CapacityMode: CapacityAuto,
+			CapacityMode: CapacityTight,
 			Seed:         44,
 		},
+		// {
+		// 	Name:         "exp_4_hard",
+		// 	NumCustomers: 12,
+		// 	Vehicles:     4,
+		// 	Width:        100,
+		// 	Height:       100,
+		// 	CapacityMode: CapacityTight,
+		// 	Seed:         45,
+		// },
 
-		{
-			Name:         "exp_4_hard",
-			NumCustomers: 12,
-			Vehicles:     4,
-			Width:        100,
-			Height:       100,
-			CapacityMode: CapacityAuto,
-			Seed:         45,
-		},
-
-		{
-			Name:         "exp_5_extreme",
-			NumCustomers: 14,
-			Vehicles:     4,
-			Width:        120,
-			Height:       120,
-			CapacityMode: CapacityAuto,
-			Seed:         46,
-		},
+		// {
+		// 	Name:         "exp_5_extreme",
+		// 	NumCustomers: 14,
+		// 	Vehicles:     4,
+		// 	Width:        120,
+		// 	Height:       120,
+		// 	CapacityMode: CapacityTight,
+		// 	Seed:         46,
+		// },
 	}
 }

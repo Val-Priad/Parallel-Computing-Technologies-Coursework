@@ -109,16 +109,15 @@ func computeCapacity(cfg GeneratorConfig, totalDemand, maxDemand int) int {
 		return max(maxDemand, 1)
 	}
 
+	requiredPerVehicle := (totalDemand + cfg.Vehicles - 1) / cfg.Vehicles
+	capacity := 0
+
 	switch cfg.CapacityMode {
 	case CapacityTight:
-		cap := totalDemand / cfg.Vehicles
-		if cap < maxDemand {
-			cap = maxDemand
-		}
-		return max(cap, 1)
+		capacity = requiredPerVehicle
 
 	case CapacityLoose:
-		return max(totalDemand, maxDemand)
+		capacity = max(totalDemand, maxDemand)
 	case CapacityFixed:
 		if cfg.FixedCapacity <= 0 {
 			return max(maxDemand, 1)
@@ -127,10 +126,15 @@ func computeCapacity(cfg GeneratorConfig, totalDemand, maxDemand int) int {
 	case CapacityAuto:
 		fallthrough
 	default:
-		cap := int(math.Ceil(float64(totalDemand) * cfg.CapacitySlack / float64(cfg.Vehicles)))
-		if cap < maxDemand {
-			cap = maxDemand
-		}
-		return max(cap, 1)
+		capacity = int(math.Ceil(float64(totalDemand) * cfg.CapacitySlack / float64(cfg.Vehicles)))
 	}
+
+	if capacity < requiredPerVehicle {
+		capacity = requiredPerVehicle
+	}
+	if capacity < maxDemand {
+		capacity = maxDemand
+	}
+
+	return max(capacity, 1)
 }
