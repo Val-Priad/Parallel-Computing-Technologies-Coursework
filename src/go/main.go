@@ -40,18 +40,31 @@ func main() {
 				fmt.Println("Failed to save greedy log:", err)
 			}
 
-			csvLogger.Log(runName, "greedy", instance, greedySolution)
+			if exp.NumCustomers <= 12 {
+				csvLogger.Log(runName, "greedy", instance, greedySolution)
 
-			bruteForceLogger := NewLogger(true)
-			exactSolution := SolveBruteForce(instance, bruteForceLogger)
+				bruteForceLogger := NewLogger(true)
+				exactSolution := SolveBruteForce(instance, bruteForceLogger)
 
-			fmt.Println("Brute:", exactSolution.Cost)
-			exactLogPath := filepath.Join("logs", fmt.Sprintf("%s_brute_force.json", runName))
-			if err := bruteForceLogger.SaveToFile(exactLogPath, points, exactSolution.Metrics); err != nil {
-				fmt.Println("Failed to save brute-force log:", err)
+				fmt.Println("Brute:", exactSolution.Cost)
+				exactLogPath := filepath.Join("logs", fmt.Sprintf("%s_brute_force.json", runName))
+				if err := bruteForceLogger.SaveToFile(exactLogPath, points, exactSolution.Metrics); err != nil {
+					fmt.Println("Failed to save brute-force log:", err)
+				}
+
+				csvLogger.Log(runName, "brute_force", instance, exactSolution)
 			}
 
-			csvLogger.Log(runName, "brute_force", instance, exactSolution)
+			acoLogger := NewLogger(true)
+			acoSolution := SolveACO(instance, acoLogger, DefaultACOConfig())
+
+			fmt.Println("ACO:", acoSolution.Cost)
+			acoLogPath := filepath.Join("logs", fmt.Sprintf("%s_aco.json", runName))
+			if err := acoLogger.SaveToFile(acoLogPath, points, acoSolution.Metrics); err != nil {
+				fmt.Println("Failed to save ACO log:", err)
+			}
+
+			csvLogger.Log(runName, "aco", instance, acoSolution)
 		}
 	}
 
