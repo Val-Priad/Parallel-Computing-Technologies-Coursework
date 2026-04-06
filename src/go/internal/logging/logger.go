@@ -1,9 +1,10 @@
-package main
+package logging
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"parallel-aco/internal/vrp"
 	"path/filepath"
 )
 
@@ -16,7 +17,7 @@ type Step struct {
 type LogOutput struct {
 	Points  map[string][]float64 `json:"points"`
 	Steps   []Step               `json:"steps"`
-	Metrics SearchMetrics        `json:"metrics"`
+	Metrics vrp.SearchMetrics    `json:"metrics"`
 }
 
 type Logger struct {
@@ -37,7 +38,7 @@ func (l *Logger) Log(step Step) {
 	l.Steps = append(l.Steps, step)
 }
 
-func (l *Logger) SaveToFile(filename string, points []Point, metrics SearchMetrics) error {
+func (l *Logger) SaveToFile(filename string, points []vrp.Point, metrics vrp.SearchMetrics) error {
 	if !l.Enabled {
 		return nil
 	}

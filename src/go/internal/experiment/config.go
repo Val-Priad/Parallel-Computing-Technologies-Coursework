@@ -1,4 +1,6 @@
-package main
+package experiment
+
+import "parallel-aco/internal/vrp"
 
 type ExperimentConfig struct {
 	Name         string
@@ -7,7 +9,7 @@ type ExperimentConfig struct {
 	Width        float64
 	Height       float64
 
-	CapacityMode CapacityMode
+	CapacityMode vrp.CapacityMode
 	Seed         int64
 }
 
@@ -19,37 +21,34 @@ func GetExperiments() []ExperimentConfig {
 			Vehicles:     2,
 			Width:        50,
 			Height:       50,
-			CapacityMode: CapacityTight,
+			CapacityMode: vrp.CapacityTight,
 			Seed:         42,
 		},
-
 		{
 			Name:         "exp_2_medium",
 			NumCustomers: 8,
 			Vehicles:     3,
 			Width:        60,
 			Height:       60,
-			CapacityMode: CapacityTight,
+			CapacityMode: vrp.CapacityTight,
 			Seed:         43,
 		},
-
 		{
 			Name:         "exp_3_hard",
 			NumCustomers: 10,
 			Vehicles:     3,
 			Width:        80,
 			Height:       80,
-			CapacityMode: CapacityTight,
+			CapacityMode: vrp.CapacityTight,
 			Seed:         44,
 		},
-
 		{
 			Name:         "exp_4_very_hard",
 			NumCustomers: 12,
 			Vehicles:     4,
 			Width:        100,
 			Height:       100,
-			CapacityMode: CapacityTight,
+			CapacityMode: vrp.CapacityTight,
 			Seed:         45,
 		},
 		{
@@ -58,7 +57,7 @@ func GetExperiments() []ExperimentConfig {
 			Vehicles:     4,
 			Width:        120,
 			Height:       120,
-			CapacityMode: CapacityTight,
+			CapacityMode: vrp.CapacityTight,
 			Seed:         46,
 		},
 	}

@@ -1,20 +1,22 @@
-package main
+package solver
 
 import (
 	"math"
+	"parallel-aco/internal/logging"
+	"parallel-aco/internal/vrp"
 	"time"
 )
 
-func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
+func SolveGreedy(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solution {
 	n := len(instance.Customers)
 	k := instance.Vehicles
 	startTime := time.Now()
 
 	if n == 0 || k == 0 {
-		return Solution{
-			Routes: []Route{},
+		return vrp.Solution{
+			Routes: []vrp.Route{},
 			Cost:   0,
-			Metrics: SearchMetrics{
+			Metrics: vrp.SearchMetrics{
 				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 			},
 		}
@@ -37,13 +39,13 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 			demandByID[customer.ID] = customer.Demand
 		}
 	}
-	routes := make([]Route, k)
+	routes := make([]vrp.Route, k)
 	current := make([]int, k)
 	currentLoad := make([]int, k)
 
 	for i := 0; i < k; i++ {
 		current[i] = 0
-		routes[i] = Route{
+		routes[i] = vrp.Route{
 			VehicleID: i,
 			Nodes:     []int{},
 		}
@@ -100,17 +102,17 @@ func SolveGreedy(instance VRPInstance, logger *Logger) Solution {
 			loggedRoutes[i] = append([]int{}, route.Nodes...)
 		}
 
-		logger.Log(Step{
+		logger.Log(logging.Step{
 			StepID: 0,
 			Routes: loggedRoutes,
 			Cost:   totalCost,
 		})
 	}
 
-	return Solution{
+	return vrp.Solution{
 		Routes: routes,
 		Cost:   totalCost,
-		Metrics: SearchMetrics{
+		Metrics: vrp.SearchMetrics{
 			DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 		},
 	}

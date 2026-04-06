@@ -1,14 +1,17 @@
-package main
+package experiment
 
 import (
 	"fmt"
+	"parallel-aco/internal/logging"
+	"parallel-aco/internal/solver"
+	"parallel-aco/internal/vrp"
 	"path/filepath"
 )
 
-func main() {
+func Run() {
 	experiments := GetExperiments()
 
-	csvLogger, err := NewCSVLogger("results.csv")
+	csvLogger, err := logging.NewCSVLogger("results.csv")
 	if err != nil {
 		panic(err)
 	}
@@ -22,7 +25,7 @@ func main() {
 
 			fmt.Println("\n=== Running", runName, "(seed", runSeed, ")===")
 
-			points, instance := GenerateInstance(GeneratorConfig{
+			points, instance := vrp.GenerateInstance(vrp.GeneratorConfig{
 				NumCustomers: exp.NumCustomers,
 				Vehicles:     exp.Vehicles,
 				Width:        exp.Width,
@@ -31,8 +34,8 @@ func main() {
 				CapacityMode: exp.CapacityMode,
 			})
 
-			greedyLogger := NewLogger(true)
-			greedySolution := SolveGreedy(instance, greedyLogger)
+			greedyLogger := logging.NewLogger(true)
+			greedySolution := solver.SolveGreedy(instance, greedyLogger)
 
 			fmt.Println("Greedy:", greedySolution.Cost)
 			greedyLogPath := filepath.Join("logs", fmt.Sprintf("%s_greedy.json", runName))
@@ -43,8 +46,8 @@ func main() {
 			if exp.NumCustomers <= 12 {
 				csvLogger.Log(runName, "greedy", instance, greedySolution)
 
-				bruteForceLogger := NewLogger(true)
-				exactSolution := SolveBruteForce(instance, bruteForceLogger)
+				bruteForceLogger := logging.NewLogger(true)
+				exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
 
 				fmt.Println("Brute:", exactSolution.Cost)
 				exactLogPath := filepath.Join("logs", fmt.Sprintf("%s_brute_force.json", runName))
@@ -55,8 +58,8 @@ func main() {
 				csvLogger.Log(runName, "brute_force", instance, exactSolution)
 			}
 
-			acoLogger := NewLogger(true)
-			acoSolution := SolveACO(instance, acoLogger, DefaultACOConfig())
+			acoLogger := logging.NewLogger(true)
+			acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
 
 			fmt.Println("ACO:", acoSolution.Cost)
 			acoLogPath := filepath.Join("logs", fmt.Sprintf("%s_aco.json", runName))

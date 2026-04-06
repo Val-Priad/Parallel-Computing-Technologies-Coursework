@@ -1,19 +1,21 @@
-package main
+package solver
 
 import (
 	"math"
+	"parallel-aco/internal/logging"
+	"parallel-aco/internal/vrp"
 	"time"
 )
 
-func SolveBruteForce(instance VRPInstance, logger *Logger) Solution {
+func SolveBruteForce(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solution {
 	n := len(instance.Customers)
 	startTime := time.Now()
 
 	if n == 0 {
-		return Solution{
-			Routes:  []Route{},
+		return vrp.Solution{
+			Routes:  []vrp.Route{},
 			Cost:    0,
-			Metrics: SearchMetrics{DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6},
+			Metrics: vrp.SearchMetrics{DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6},
 		}
 	}
 
@@ -22,16 +24,16 @@ func SolveBruteForce(instance VRPInstance, logger *Logger) Solution {
 		perm[i] = i + 2
 	}
 
-	best := Solution{Cost: math.Inf(1)}
+	best := vrp.Solution{Cost: math.Inf(1)}
 
 	stepID := 0
 
-	Permute(perm, func(p []int) {
+	permute(perm, func(p []int) {
 		order := make([]int, n)
 		order[0] = 1
 		copy(order[1:], p)
 
-		sol := Evaluate(instance, order)
+		sol := evaluate(instance, order)
 		if sol.Cost < best.Cost {
 			loggedRoutes := make([][]int, len(sol.Routes))
 			for i, route := range sol.Routes {
@@ -40,7 +42,7 @@ func SolveBruteForce(instance VRPInstance, logger *Logger) Solution {
 
 			best = sol
 
-			logger.Log(Step{
+			logger.Log(logging.Step{
 				StepID: stepID,
 				Routes: loggedRoutes,
 				Cost:   sol.Cost,
@@ -50,14 +52,14 @@ func SolveBruteForce(instance VRPInstance, logger *Logger) Solution {
 		}
 	})
 
-	best.Metrics = SearchMetrics{
+	best.Metrics = vrp.SearchMetrics{
 		DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 	}
 
 	return best
 }
 
-func Permute(arr []int, f func([]int)) {
+func permute(arr []int, f func([]int)) {
 	if len(arr) == 0 {
 		f([]int{})
 		return
@@ -83,14 +85,14 @@ func Permute(arr []int, f func([]int)) {
 	generate(len(arr))
 }
 
-func Evaluate(instance VRPInstance, order []int) Solution {
+func evaluate(instance vrp.VRPInstance, order []int) vrp.Solution {
 	k := instance.Vehicles
 	n := len(order)
 	if n == 0 || k == 0 {
-		return Solution{Routes: []Route{}, Cost: 0}
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}
 	}
 
-	best := Solution{Cost: math.Inf(1), Routes: []Route{}}
+	best := vrp.Solution{Cost: math.Inf(1), Routes: []vrp.Route{}}
 	dist := instance.Dist
 	capacity := instance.VehicleCapacity
 	demandByID := make([]int, len(dist))
@@ -101,14 +103,14 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	}
 	routeEnds := make([]int, k)
 
-	var buildRoutesFromEnds = func() []Route {
-		routes := make([]Route, k)
+	var buildRoutesFromEnds = func() []vrp.Route {
+		routes := make([]vrp.Route, k)
 		segmentStart := 0
 		for i := 0; i < k; i++ {
 			segmentEnd := routeEnds[i]
 			nodes := make([]int, segmentEnd-segmentStart)
 			copy(nodes, order[segmentStart:segmentEnd])
-			routes[i] = Route{
+			routes[i] = vrp.Route{
 				VehicleID: i,
 				Nodes:     nodes,
 			}
@@ -193,8 +195,8 @@ func Evaluate(instance VRPInstance, order []int) Solution {
 	search(0, 0, 0, 0)
 
 	if math.IsInf(best.Cost, 1) {
-		return Solution{
-			Routes: []Route{},
+		return vrp.Solution{
+			Routes: []vrp.Route{},
 			Cost:   math.Inf(1),
 		}
 	}

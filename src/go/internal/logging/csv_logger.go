@@ -1,8 +1,9 @@
-package main
+package logging
 
 import (
 	"encoding/csv"
 	"os"
+	"parallel-aco/internal/vrp"
 	"strconv"
 )
 
@@ -40,8 +41,8 @@ func NewCSVLogger(filename string) (*CSVLogger, error) {
 func (c *CSVLogger) Log(
 	expName string,
 	algorithm string,
-	instance VRPInstance,
-	solution Solution,
+	instance vrp.VRPInstance,
+	solution vrp.Solution,
 ) {
 	feasible := isSolutionComplete(instance, solution)
 
@@ -58,7 +59,7 @@ func (c *CSVLogger) Log(
 	})
 }
 
-func isSolutionComplete(instance VRPInstance, solution Solution) bool {
+func isSolutionComplete(instance vrp.VRPInstance, solution vrp.Solution) bool {
 	if len(instance.Customers) == 0 {
 		return true
 	}

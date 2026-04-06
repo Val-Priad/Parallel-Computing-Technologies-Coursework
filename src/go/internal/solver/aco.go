@@ -1,8 +1,10 @@
-package main
+package solver
 
 import (
 	"math"
 	"math/rand"
+	"parallel-aco/internal/logging"
+	"parallel-aco/internal/vrp"
 	"time"
 )
 
@@ -30,7 +32,7 @@ type ACOConfig struct {
 }
 
 type antSolution struct {
-	Solution Solution
+	Solution vrp.Solution
 	Feasible bool
 }
 
@@ -48,14 +50,14 @@ func DefaultACOConfig() ACOConfig {
 	}
 }
 
-func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
+func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) vrp.Solution {
 	startTime := time.Now()
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
-		return Solution{
-			Routes: []Route{},
+		return vrp.Solution{
+			Routes: []vrp.Route{},
 			Cost:   0,
-			Metrics: SearchMetrics{
+			Metrics: vrp.SearchMetrics{
 				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 			},
 		}
@@ -63,7 +65,7 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 
 	applyConfigDefaults(&cfg)
 	if !validateInstance(instance) {
-		return solutionWithMetrics([]Route{}, math.Inf(1), startTime)
+		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
 	n := len(instance.Dist)
@@ -71,8 +73,8 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 
 	rng := rand.New(rand.NewSource(cfg.Seed))
 
-	best := Solution{
-		Routes: []Route{},
+	best := vrp.Solution{
+		Routes: []vrp.Route{},
 		Cost:   math.Inf(1),
 	}
 
@@ -110,7 +112,7 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 	}
 
 	if math.IsInf(best.Cost, 1) {
-		return solutionWithMetrics([]Route{}, math.Inf(1), startTime)
+		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
 	return solutionWithMetrics(best.Routes, best.Cost, startTime)
@@ -146,7 +148,7 @@ func applyConfigDefaults(cfg *ACOConfig) {
 	}
 }
 
-func validateInstance(instance VRPInstance) bool {
+func validateInstance(instance vrp.VRPInstance) bool {
 	n := len(instance.Dist)
 	if n == 0 {
 		return len(instance.Customers) == 0
@@ -170,17 +172,17 @@ func validateInstance(instance VRPInstance) bool {
 	return true
 }
 
-func solutionWithMetrics(routes []Route, cost float64, startTime time.Time) Solution {
-	return Solution{
+func solutionWithMetrics(routes []vrp.Route, cost float64, startTime time.Time) vrp.Solution {
+	return vrp.Solution{
 		Routes: routes,
 		Cost:   cost,
-		Metrics: SearchMetrics{
+		Metrics: vrp.SearchMetrics{
 			DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
 		},
 	}
 }
 
-func logSolutionStep(logger *Logger, stepID int, sol Solution) int {
+func logSolutionStep(logger *logging.Logger, stepID int, sol vrp.Solution) int {
 	if logger == nil {
 		return stepID
 	}
@@ -190,7 +192,7 @@ func logSolutionStep(logger *Logger, stepID int, sol Solution) int {
 		loggedRoutes[i] = append([]int{}, route.Nodes...)
 	}
 
-	logger.Log(Step{
+	logger.Log(logging.Step{
 		StepID: stepID,
 		Routes: loggedRoutes,
 		Cost:   sol.Cost,
@@ -200,14 +202,14 @@ func logSolutionStep(logger *Logger, stepID int, sol Solution) int {
 }
 
 func buildSolution(
-	instance VRPInstance,
+	instance vrp.VRPInstance,
 	pheromone [][]float64,
 	cfg ACOConfig,
 	rng *rand.Rand,
-) (Solution, bool) {
+) (vrp.Solution, bool) {
 	n := len(instance.Dist)
 	if n == 0 {
-		return Solution{Routes: []Route{}, Cost: 0}, true
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
 	}
 
 	demandByID := make([]int, n)
@@ -218,10 +220,10 @@ func buildSolution(
 	}
 
 	if len(customers) == 0 {
-		return Solution{Routes: []Route{}, Cost: 0}, true
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
 	}
 	unvisited := append([]int{}, customers...)
-	routes := make([]Route, 0, instance.Vehicles)
+	routes := make([]vrp.Route, 0, instance.Vehicles)
 
 	for len(unvisited) > 0 && len(routes) < instance.Vehicles {
 		routeNodes := make([]int, 0)
@@ -245,11 +247,11 @@ func buildSolution(
 			unvisited = removeCustomerValue(unvisited, next)
 		}
 
-		routes = append(routes, Route{Nodes: routeNodes})
+		routes = append(routes, vrp.Route{Nodes: routeNodes})
 	}
 
 	if len(unvisited) > 0 {
-		return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: math.Inf(1)}, false
 	}
 
 	for i := range routes {
@@ -257,7 +259,7 @@ func buildSolution(
 	}
 
 	for len(routes) < instance.Vehicles {
-		routes = append(routes, Route{VehicleID: len(routes), Nodes: []int{}})
+		routes = append(routes, vrp.Route{VehicleID: len(routes), Nodes: []int{}})
 	}
 
 	totalCost := 0.0
@@ -265,7 +267,7 @@ func buildSolution(
 		totalCost += computeRouteCost(route.Nodes, instance.Dist)
 	}
 
-	return Solution{
+	return vrp.Solution{
 		Routes: routes,
 		Cost:   totalCost,
 	}, true
@@ -380,7 +382,7 @@ func evaporate(pheromone [][]float64, evaporation float64) {
 	}
 }
 
-func depositSolution(pheromone [][]float64, solution Solution, amount float64) {
+func depositSolution(pheromone [][]float64, solution vrp.Solution, amount float64) {
 	if amount <= 0 {
 		return
 	}
@@ -420,19 +422,19 @@ func makeMatrix(rows, cols int, value float64) [][]float64 {
 	return m
 }
 
-func cloneSolution(sol Solution) Solution {
-	clonedRoutes := make([]Route, len(sol.Routes))
+func cloneSolution(sol vrp.Solution) vrp.Solution {
+	clonedRoutes := make([]vrp.Route, len(sol.Routes))
 	for i, route := range sol.Routes {
-		clonedRoutes[i] = Route{
+		clonedRoutes[i] = vrp.Route{
 			VehicleID: route.VehicleID,
 			Nodes:     append([]int{}, route.Nodes...),
 		}
 	}
 
-	return Solution{
+	return vrp.Solution{
 		Routes: clonedRoutes,
 		Cost:   sol.Cost,
-		Metrics: SearchMetrics{
+		Metrics: vrp.SearchMetrics{
 			DurationMS: sol.Metrics.DurationMS,
 		},
 	}
