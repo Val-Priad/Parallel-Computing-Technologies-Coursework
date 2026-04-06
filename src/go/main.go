@@ -1,44 +1,48 @@
 package main
 
-import (
-	"fmt"
-	"path/filepath"
-)
+import "fmt"
 
 func main() {
-	points, instance := GenerateInstance(GeneratorConfig{
-		NumCustomers: 10,
-		Vehicles:     3,
-		Width:        50,
-		Height:       50,
-		Seed:         42,
-	})
+	experiments := GetExperiments()
 
-	logger := NewLogger(true)
+	csvLogger, err := NewCSVLogger("results.csv")
+	if err != nil {
+		panic(err)
+	}
+	defer csvLogger.Close()
 
-	solution := SolveVRP(instance, logger)
+	for _, exp := range experiments {
+		baseSeed := exp.Seed
+		for i := 0; i < 5; i++ {
+			runSeed := baseSeed + int64(i)
+			runName := fmt.Sprintf("%s_run_%d", exp.Name, i+1)
 
-	fmt.Println("Best cost:", solution.Cost)
-	fmt.Println("Routes:", solution.Routes)
-	fmt.Printf("Execution time: %.3f ms\n", solution.Metrics.DurationMS)
+			fmt.Println("\n=== Running", runName, "(seed", runSeed, ")===")
 
-	exactLogName := filepath.Join("logs",
-		fmt.Sprintf("brute-force__vehicles-%d_customers-%d.json",
-			instance.Vehicles, len(instance.Customers)),
-	)
-	logger.SaveToFile(exactLogName, points, solution.Metrics)
+			_, instance := GenerateInstance(GeneratorConfig{
+				NumCustomers: exp.NumCustomers,
+				Vehicles:     exp.Vehicles,
+				Width:        exp.Width,
+				Height:       exp.Height,
+				Seed:         runSeed,
+				CapacityMode: exp.CapacityMode,
+			})
 
-	greedyLogger := NewLogger(true)
-	greedySolution := SolveGreedy(instance, greedyLogger)
+			greedyLogger := NewLogger(false)
+			greedySolution := SolveGreedy(instance, greedyLogger)
 
-	fmt.Println("\n--- Greedy ---")
-	fmt.Println("Cost:", greedySolution.Cost)
-	fmt.Println("Routes:", greedySolution.Routes)
-	fmt.Printf("Execution time: %.3f ms\n", greedySolution.Metrics.DurationMS)
+			fmt.Println("Greedy:", greedySolution.Cost)
 
-	greedyLogName := filepath.Join("logs",
-		fmt.Sprintf("greedy__vehicles-%d_customers-%d.json",
-			instance.Vehicles, len(instance.Customers)),
-	)
-	greedyLogger.SaveToFile(greedyLogName, points, greedySolution.Metrics)
+			csvLogger.Log(runName, "greedy", instance, greedySolution)
+
+			exactLogger := NewLogger(false)
+			exactSolution := SolveVRP(instance, exactLogger)
+
+			fmt.Println("Brute:", exactSolution.Cost)
+
+			csvLogger.Log(runName, "brute_force", instance, exactSolution)
+		}
+	}
+
+	fmt.Println("\nDone. Results saved to results.csv")
 }
