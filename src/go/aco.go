@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	defaultNumAnts          = 20
-	defaultIterations       = 100
-	defaultAlpha            = 1.0
-	defaultBeta             = 2.0
-	defaultEvaporation      = 0.5
+	defaultNumAnts          = 25
+	defaultIterations       = 200
+	defaultAlpha            = 0.5
+	defaultBeta             = 1.0
+	defaultEvaporation      = 0.6
 	defaultQ                = 100.0
 	defaultInitialPheromone = 1.0
 	defaultEliteWeight      = 1.0
