@@ -9,7 +9,6 @@ import (
 const (
 	selectionNoise    = 0.05
 	candidateListSize = 5
-	violationPenalty  = 1000.0
 )
 
 type ACOConfig struct {
@@ -196,7 +195,6 @@ func buildAntSolution(
 	}
 	unvisited := append([]int{}, customers...)
 	routes := make([]Route, 0, instance.Vehicles)
-	totalPenalty := 0.0
 
 	for len(unvisited) > 0 && len(routes) < instance.Vehicles {
 		routeNodes := make([]int, 0)
@@ -224,16 +222,7 @@ func buildAntSolution(
 	}
 
 	if len(unvisited) > 0 {
-		if len(routes) == 0 {
-			routes = append(routes, Route{Nodes: []int{}})
-		}
-
-		last := len(routes) - 1
-		for _, node := range unvisited {
-			routes[last].Nodes = append(routes[last].Nodes, node)
-			totalPenalty += violationPenalty
-		}
-		unvisited = unvisited[:0]
+		return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
 	}
 
 	for i := range routes {
@@ -253,13 +242,13 @@ func buildAntSolution(
 			load += demandByID[node]
 		}
 		if load > instance.VehicleCapacity {
-			totalPenalty += violationPenalty
+			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
 		}
 	}
 
 	return Solution{
 		Routes: routes,
-		Cost:   totalCost + totalPenalty,
+		Cost:   totalCost,
 	}, true
 }
 
