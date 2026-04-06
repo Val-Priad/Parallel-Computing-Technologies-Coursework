@@ -12,6 +12,7 @@ type VRPInstance struct {
 	Customers       []Point
 	Vehicles        int
 	VehicleCapacity int
+	CapacityMode    CapacityMode
 	Dist            [][]float64
 }
 

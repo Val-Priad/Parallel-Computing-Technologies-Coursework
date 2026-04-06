@@ -94,6 +94,7 @@ func GenerateInstance(cfg GeneratorConfig) ([]Point, VRPInstance) {
 		Customers:       points[1:],
 		Vehicles:        cfg.Vehicles,
 		VehicleCapacity: vehicleCapacity,
+		CapacityMode:    cfg.CapacityMode,
 		Dist:            dist,
 	}
 
