@@ -9,7 +9,7 @@ DATA_FILE = (
     Path(__file__).resolve().parent.resolve().parent
     / "go"
     / "logs"
-    / "brute-force__vehicles-2_customers-4.json"
+    / "exp_3_medium_run_1_brute_force.json"
 )
 with DATA_FILE.open("r", encoding="utf-8") as f:
     data = json.load(f)

@@ -22,7 +22,7 @@ func main() {
 
 			fmt.Println("\n=== Running", runName, "(seed", runSeed, ")===")
 
-			_, instance := GenerateInstance(GeneratorConfig{
+			points, instance := GenerateInstance(GeneratorConfig{
 				NumCustomers: exp.NumCustomers,
 				Vehicles:     exp.Vehicles,
 				Width:        exp.Width,
@@ -36,7 +36,7 @@ func main() {
 
 			fmt.Println("Greedy:", greedySolution.Cost)
 			greedyLogPath := filepath.Join("logs", fmt.Sprintf("%s_greedy.json", runName))
-			if err := greedyLogger.SaveToFile(greedyLogPath, instance.Customers, greedySolution.Metrics); err != nil {
+			if err := greedyLogger.SaveToFile(greedyLogPath, points, greedySolution.Metrics); err != nil {
 				fmt.Println("Failed to save greedy log:", err)
 			}
 
@@ -47,7 +47,7 @@ func main() {
 
 			fmt.Println("Brute:", exactSolution.Cost)
 			exactLogPath := filepath.Join("logs", fmt.Sprintf("%s_brute_force.json", runName))
-			if err := bruteForceLogger.SaveToFile(exactLogPath, instance.Customers, exactSolution.Metrics); err != nil {
+			if err := bruteForceLogger.SaveToFile(exactLogPath, points, exactSolution.Metrics); err != nil {
 				fmt.Println("Failed to save brute-force log:", err)
 			}
 
