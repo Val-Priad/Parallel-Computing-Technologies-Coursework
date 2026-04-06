@@ -7,8 +7,14 @@ import (
 )
 
 const (
-	selectionNoise    = 0.05
-	candidateListSize = 5
+	defaultNumAnts          = 20
+	defaultIterations       = 100
+	defaultAlpha            = 1.0
+	defaultBeta             = 2.0
+	defaultEvaporation      = 0.5
+	defaultQ                = 100.0
+	defaultInitialPheromone = 1.0
+	defaultEliteWeight      = 1.0
 )
 
 type ACOConfig struct {
@@ -30,14 +36,14 @@ type antSolution struct {
 
 func DefaultACOConfig() ACOConfig {
 	return ACOConfig{
-		NumAnts:          20,
-		Iterations:       100,
-		Alpha:            1.0,
-		Beta:             2.0,
-		Evaporation:      0.5,
-		Q:                100.0,
-		InitialPheromone: 1.0,
-		EliteWeight:      1.0,
+		NumAnts:          defaultNumAnts,
+		Iterations:       defaultIterations,
+		Alpha:            defaultAlpha,
+		Beta:             defaultBeta,
+		Evaporation:      defaultEvaporation,
+		Q:                defaultQ,
+		InitialPheromone: defaultInitialPheromone,
+		EliteWeight:      defaultEliteWeight,
 		Seed:             time.Now().UnixNano(),
 	}
 }
@@ -55,7 +61,10 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 		}
 	}
 
-	applyACOConfigDefaults(&cfg)
+	applyConfigDefaults(&cfg)
+	if !validateInstance(instance) {
+		return solutionWithMetrics([]Route{}, math.Inf(1), startTime)
+	}
 
 	n := len(instance.Dist)
 	pheromone := makeMatrix(n, n, cfg.InitialPheromone)
@@ -73,7 +82,7 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 		ants := make([]antSolution, 0, cfg.NumAnts)
 
 		for ant := 0; ant < cfg.NumAnts; ant++ {
-			sol, feasible := buildAntSolution(instance, pheromone, cfg, rng)
+			sol, feasible := buildSolution(instance, pheromone, cfg, rng)
 
 			ants = append(ants, antSolution{
 				Solution: sol,
@@ -82,27 +91,14 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 
 			if feasible && sol.Cost < best.Cost {
 				best = cloneSolution(sol)
-
-				if logger != nil {
-					loggedRoutes := make([][]int, len(best.Routes))
-					for i, route := range best.Routes {
-						loggedRoutes[i] = append([]int{}, route.Nodes...)
-					}
-
-					logger.Log(Step{
-						StepID: stepID,
-						Routes: loggedRoutes,
-						Cost:   best.Cost,
-					})
-					stepID++
-				}
+				stepID = logSolutionStep(logger, stepID, best)
 			}
 		}
 
 		evaporate(pheromone, cfg.Evaporation)
 
 		for _, ant := range ants {
-			if !ant.Feasible || math.IsInf(ant.Solution.Cost, 1) || ant.Solution.Cost <= 0 {
+			if !ant.Feasible || ant.Solution.Cost <= 0 {
 				continue
 			}
 			depositSolution(pheromone, ant.Solution, cfg.Q/ant.Solution.Cost)
@@ -114,53 +110,96 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 	}
 
 	if math.IsInf(best.Cost, 1) {
-		return Solution{
-			Routes: []Route{},
-			Cost:   math.Inf(1),
-			Metrics: SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
-			},
-		}
+		return solutionWithMetrics([]Route{}, math.Inf(1), startTime)
 	}
 
-	best.Metrics = SearchMetrics{
-		DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
-	}
-
-	return best
+	return solutionWithMetrics(best.Routes, best.Cost, startTime)
 }
 
-func applyACOConfigDefaults(cfg *ACOConfig) {
+func applyConfigDefaults(cfg *ACOConfig) {
 	if cfg.NumAnts <= 0 {
-		cfg.NumAnts = 20
+		cfg.NumAnts = defaultNumAnts
 	}
 	if cfg.Iterations <= 0 {
-		cfg.Iterations = 100
+		cfg.Iterations = defaultIterations
 	}
 	if cfg.Alpha <= 0 {
-		cfg.Alpha = 1.0
+		cfg.Alpha = defaultAlpha
 	}
 	if cfg.Beta <= 0 {
-		cfg.Beta = 2.0
+		cfg.Beta = defaultBeta
 	}
 	if cfg.Evaporation <= 0 || cfg.Evaporation >= 1 {
-		cfg.Evaporation = 0.5
+		cfg.Evaporation = defaultEvaporation
 	}
 	if cfg.Q <= 0 {
-		cfg.Q = 100.0
+		cfg.Q = defaultQ
 	}
 	if cfg.InitialPheromone <= 0 {
-		cfg.InitialPheromone = 1.0
+		cfg.InitialPheromone = defaultInitialPheromone
 	}
 	if cfg.EliteWeight < 0 {
-		cfg.EliteWeight = 1.0
+		cfg.EliteWeight = defaultEliteWeight
 	}
 	if cfg.Seed == 0 {
 		cfg.Seed = time.Now().UnixNano()
 	}
 }
 
-func buildAntSolution(
+func validateInstance(instance VRPInstance) bool {
+	n := len(instance.Dist)
+	if n == 0 {
+		return len(instance.Customers) == 0
+	}
+
+	seen := make([]bool, n)
+	for _, c := range instance.Customers {
+		if c.ID < 0 || c.ID >= n {
+			return false
+		}
+		if seen[c.ID] {
+			return false
+		}
+		if c.Demand > instance.VehicleCapacity {
+			return false
+		}
+
+		seen[c.ID] = true
+	}
+
+	return true
+}
+
+func solutionWithMetrics(routes []Route, cost float64, startTime time.Time) Solution {
+	return Solution{
+		Routes: routes,
+		Cost:   cost,
+		Metrics: SearchMetrics{
+			DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+		},
+	}
+}
+
+func logSolutionStep(logger *Logger, stepID int, sol Solution) int {
+	if logger == nil {
+		return stepID
+	}
+
+	loggedRoutes := make([][]int, len(sol.Routes))
+	for i, route := range sol.Routes {
+		loggedRoutes[i] = append([]int{}, route.Nodes...)
+	}
+
+	logger.Log(Step{
+		StepID: stepID,
+		Routes: loggedRoutes,
+		Cost:   sol.Cost,
+	})
+
+	return stepID + 1
+}
+
+func buildSolution(
 	instance VRPInstance,
 	pheromone [][]float64,
 	cfg ACOConfig,
@@ -173,20 +212,8 @@ func buildAntSolution(
 
 	demandByID := make([]int, n)
 	customers := make([]int, 0, len(instance.Customers))
-	seen := make([]bool, n)
 	for _, c := range instance.Customers {
-		if c.ID < 0 || c.ID >= n {
-			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
-		}
-		if seen[c.ID] {
-			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
-		}
-		if c.Demand > instance.VehicleCapacity {
-			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
-		}
-
 		demandByID[c.ID] = c.Demand
-		seen[c.ID] = true
 		customers = append(customers, c.ID)
 	}
 
@@ -236,14 +263,6 @@ func buildAntSolution(
 	totalCost := 0.0
 	for _, route := range routes {
 		totalCost += computeRouteCost(route.Nodes, instance.Dist)
-
-		load := 0
-		for _, node := range route.Nodes {
-			load += demandByID[node]
-		}
-		if load > instance.VehicleCapacity {
-			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
-		}
 	}
 
 	return Solution{
@@ -289,15 +308,8 @@ func selectNextCustomer(
 	if len(candidates) == 0 {
 		return -1
 	}
-	candidates = nearestNeighbors(current, candidates, dist, candidateListSize)
-	if len(candidates) == 0 {
-		return -1
-	}
 	if len(candidates) == 1 {
 		return candidates[0]
-	}
-	if rng.Float64() < 0.1 {
-		return candidates[rng.Intn(len(candidates))]
 	}
 
 	type weightedCandidate struct {
@@ -317,9 +329,8 @@ func selectNextCustomer(
 		tau := math.Pow(pheromone[current][node], cfg.Alpha)
 		eta := math.Pow(1.0/d, cfg.Beta)
 		w := tau * eta
-		w *= 1.0 + selectionNoise*rng.Float64()
 
-		if math.IsNaN(w) || math.IsInf(w, 0) || w <= 0 {
+		if w <= 0 {
 			w = 1e-12
 		}
 
@@ -354,44 +365,6 @@ func selectNextCustomer(
 	return weighted[len(weighted)-1].Node
 }
 
-func nearestNeighbors(current int, candidates []int, dist [][]float64, k int) []int {
-	if k <= 0 || len(candidates) <= k {
-		return candidates
-	}
-
-	selected := make([]int, 0, k)
-	used := make([]bool, len(candidates))
-
-	for len(selected) < k {
-		bestIndex := -1
-		bestDist := math.Inf(1)
-
-		for i, node := range candidates {
-			if used[i] {
-				continue
-			}
-			d := dist[current][node]
-			if d < bestDist {
-				bestDist = d
-				bestIndex = i
-			}
-		}
-
-		if bestIndex == -1 {
-			break
-		}
-
-		used[bestIndex] = true
-		selected = append(selected, candidates[bestIndex])
-	}
-
-	if len(selected) == 0 {
-		return candidates
-	}
-
-	return selected
-}
-
 func evaporate(pheromone [][]float64, evaporation float64) {
 	factor := 1.0 - evaporation
 
@@ -408,7 +381,7 @@ func evaporate(pheromone [][]float64, evaporation float64) {
 }
 
 func depositSolution(pheromone [][]float64, solution Solution, amount float64) {
-	if amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
+	if amount <= 0 {
 		return
 	}
 
