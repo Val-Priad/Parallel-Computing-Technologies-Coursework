@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+const (
+	selectionNoise    = 0.05
+	candidateListSize = 5
+	violationPenalty  = 1000.0
+)
+
 type ACOConfig struct {
 	NumAnts          int
 	Iterations       int
@@ -28,11 +34,11 @@ func DefaultACOConfig() ACOConfig {
 		NumAnts:          20,
 		Iterations:       100,
 		Alpha:            1.0,
-		Beta:             3.0,
+		Beta:             2.0,
 		Evaporation:      0.5,
 		Q:                100.0,
 		InitialPheromone: 1.0,
-		EliteWeight:      2.0,
+		EliteWeight:      1.0,
 		Seed:             time.Now().UnixNano(),
 	}
 }
@@ -66,7 +72,6 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 
 	for iter := 0; iter < cfg.Iterations; iter++ {
 		ants := make([]antSolution, 0, cfg.NumAnts)
-		iterBest := Solution{Cost: math.Inf(1)}
 
 		for ant := 0; ant < cfg.NumAnts; ant++ {
 			sol, feasible := buildAntSolution(instance, pheromone, cfg, rng)
@@ -76,9 +81,6 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 				Feasible: feasible,
 			})
 
-			if feasible && sol.Cost < iterBest.Cost {
-				iterBest = sol
-			}
 			if feasible && sol.Cost < best.Cost {
 				best = cloneSolution(sol)
 
@@ -105,10 +107,6 @@ func SolveACO(instance VRPInstance, logger *Logger, cfg ACOConfig) Solution {
 				continue
 			}
 			depositSolution(pheromone, ant.Solution, cfg.Q/ant.Solution.Cost)
-		}
-
-		if !math.IsInf(iterBest.Cost, 1) && iterBest.Cost > 0 {
-			depositSolution(pheromone, iterBest, cfg.EliteWeight*cfg.Q/iterBest.Cost)
 		}
 
 		if !math.IsInf(best.Cost, 1) && best.Cost > 0 {
@@ -144,7 +142,7 @@ func applyACOConfigDefaults(cfg *ACOConfig) {
 		cfg.Alpha = 1.0
 	}
 	if cfg.Beta <= 0 {
-		cfg.Beta = 3.0
+		cfg.Beta = 2.0
 	}
 	if cfg.Evaporation <= 0 || cfg.Evaporation >= 1 {
 		cfg.Evaporation = 0.5
@@ -156,7 +154,7 @@ func applyACOConfigDefaults(cfg *ACOConfig) {
 		cfg.InitialPheromone = 1.0
 	}
 	if cfg.EliteWeight < 0 {
-		cfg.EliteWeight = 0
+		cfg.EliteWeight = 1.0
 	}
 	if cfg.Seed == 0 {
 		cfg.Seed = time.Now().UnixNano()
@@ -170,47 +168,43 @@ func buildAntSolution(
 	rng *rand.Rand,
 ) (Solution, bool) {
 	n := len(instance.Dist)
-	capacity := instance.VehicleCapacity
-	vehicles := instance.Vehicles
-
-	if n == 0 || vehicles == 0 {
+	if n == 0 {
 		return Solution{Routes: []Route{}, Cost: 0}, true
 	}
 
 	demandByID := make([]int, n)
-	customerSet := make([]bool, n)
+	customers := make([]int, 0, len(instance.Customers))
+	seen := make([]bool, n)
 	for _, c := range instance.Customers {
-		if c.ID >= 0 && c.ID < n {
-			demandByID[c.ID] = c.Demand
-			customerSet[c.ID] = true
+		if c.ID < 0 || c.ID >= n {
+			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
 		}
+		if seen[c.ID] {
+			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
+		}
+		if c.Demand > instance.VehicleCapacity {
+			return Solution{Routes: []Route{}, Cost: math.Inf(1)}, false
+		}
+
+		demandByID[c.ID] = c.Demand
+		seen[c.ID] = true
+		customers = append(customers, c.ID)
 	}
 
-	visited := make([]bool, n)
-	remaining := len(instance.Customers)
+	if len(customers) == 0 {
+		return Solution{Routes: []Route{}, Cost: 0}, true
+	}
+	unvisited := append([]int{}, customers...)
+	routes := make([]Route, 0, instance.Vehicles)
+	totalPenalty := 0.0
 
-	routes := make([]Route, 0, vehicles)
-
-	for v := 0; v < vehicles; v++ {
+	for len(unvisited) > 0 && len(routes) < instance.Vehicles {
+		routeNodes := make([]int, 0)
+		load := 0
 		current := 0
-		currentLoad := 0
-		nodes := make([]int, 0)
 
 		for {
-			candidates := make([]int, 0)
-			for _, c := range instance.Customers {
-				if c.ID < 0 || c.ID >= n {
-					continue
-				}
-				if visited[c.ID] {
-					continue
-				}
-				if currentLoad+demandByID[c.ID] > capacity {
-					continue
-				}
-				candidates = append(candidates, c.ID)
-			}
-
+			candidates := feasibleCustomers(unvisited, load, instance.VehicleCapacity, demandByID)
 			if len(candidates) == 0 {
 				break
 			}
@@ -220,54 +214,79 @@ func buildAntSolution(
 				break
 			}
 
-			nodes = append(nodes, next)
-			visited[next] = true
-			currentLoad += demandByID[next]
+			routeNodes = append(routeNodes, next)
+			load += demandByID[next]
 			current = next
-			remaining--
+			unvisited = removeCustomerValue(unvisited, next)
 		}
 
-		routes = append(routes, Route{
-			VehicleID: v,
-			Nodes:     nodes,
-		})
-
-		if remaining == 0 {
-			for vv := v + 1; vv < vehicles; vv++ {
-				routes = append(routes, Route{
-					VehicleID: vv,
-					Nodes:     []int{},
-				})
-			}
-			break
-		}
+		routes = append(routes, Route{Nodes: routeNodes})
 	}
 
-	if remaining > 0 {
-		return Solution{
-			Routes: routes,
-			Cost:   math.Inf(1),
-		}, false
+	if len(unvisited) > 0 {
+		if len(routes) == 0 {
+			routes = append(routes, Route{Nodes: []int{}})
+		}
+
+		last := len(routes) - 1
+		for _, node := range unvisited {
+			routes[last].Nodes = append(routes[last].Nodes, node)
+			totalPenalty += violationPenalty
+		}
+		unvisited = unvisited[:0]
 	}
 
-	for _, c := range instance.Customers {
-		if c.ID < 0 || c.ID >= n || !customerSet[c.ID] || !visited[c.ID] {
-			return Solution{
-				Routes: routes,
-				Cost:   math.Inf(1),
-			}, false
-		}
+	for i := range routes {
+		routes[i].VehicleID = i
+	}
+
+	for len(routes) < instance.Vehicles {
+		routes = append(routes, Route{VehicleID: len(routes), Nodes: []int{}})
 	}
 
 	totalCost := 0.0
 	for _, route := range routes {
 		totalCost += computeRouteCost(route.Nodes, instance.Dist)
+
+		load := 0
+		for _, node := range route.Nodes {
+			load += demandByID[node]
+		}
+		if load > instance.VehicleCapacity {
+			totalPenalty += violationPenalty
+		}
 	}
 
 	return Solution{
 		Routes: routes,
-		Cost:   totalCost,
+		Cost:   totalCost + totalPenalty,
 	}, true
+}
+
+func feasibleCustomers(unvisited []int, currentLoad, capacity int, demandByID []int) []int {
+	result := make([]int, 0, len(unvisited))
+	for _, node := range unvisited {
+		demand := demandByID[node]
+		if currentLoad+demand <= capacity {
+			result = append(result, node)
+		}
+	}
+	return result
+}
+
+func removeCustomerAt(values []int, index int) []int {
+	copy(values[index:], values[index+1:])
+	return values[:len(values)-1]
+}
+
+func removeCustomerValue(values []int, value int) []int {
+	for index, candidate := range values {
+		if candidate == value {
+			return removeCustomerAt(values, index)
+		}
+	}
+
+	return values
 }
 
 func selectNextCustomer(
@@ -281,8 +300,15 @@ func selectNextCustomer(
 	if len(candidates) == 0 {
 		return -1
 	}
+	candidates = nearestNeighbors(current, candidates, dist, candidateListSize)
+	if len(candidates) == 0 {
+		return -1
+	}
 	if len(candidates) == 1 {
 		return candidates[0]
+	}
+	if rng.Float64() < 0.1 {
+		return candidates[rng.Intn(len(candidates))]
 	}
 
 	type weightedCandidate struct {
@@ -302,6 +328,7 @@ func selectNextCustomer(
 		tau := math.Pow(pheromone[current][node], cfg.Alpha)
 		eta := math.Pow(1.0/d, cfg.Beta)
 		w := tau * eta
+		w *= 1.0 + selectionNoise*rng.Float64()
 
 		if math.IsNaN(w) || math.IsInf(w, 0) || w <= 0 {
 			w = 1e-12
@@ -338,16 +365,55 @@ func selectNextCustomer(
 	return weighted[len(weighted)-1].Node
 }
 
+func nearestNeighbors(current int, candidates []int, dist [][]float64, k int) []int {
+	if k <= 0 || len(candidates) <= k {
+		return candidates
+	}
+
+	selected := make([]int, 0, k)
+	used := make([]bool, len(candidates))
+
+	for len(selected) < k {
+		bestIndex := -1
+		bestDist := math.Inf(1)
+
+		for i, node := range candidates {
+			if used[i] {
+				continue
+			}
+			d := dist[current][node]
+			if d < bestDist {
+				bestDist = d
+				bestIndex = i
+			}
+		}
+
+		if bestIndex == -1 {
+			break
+		}
+
+		used[bestIndex] = true
+		selected = append(selected, candidates[bestIndex])
+	}
+
+	if len(selected) == 0 {
+		return candidates
+	}
+
+	return selected
+}
+
 func evaporate(pheromone [][]float64, evaporation float64) {
 	factor := 1.0 - evaporation
-	minPheromone := 1e-6
 
 	for i := 0; i < len(pheromone); i++ {
 		for j := 0; j < len(pheromone[i]); j++ {
-			pheromone[i][j] *= factor
-			if pheromone[i][j] < minPheromone {
-				pheromone[i][j] = minPheromone
+			if i == j {
+				pheromone[i][j] = 0
+				continue
 			}
+
+			pheromone[i][j] *= factor
 		}
 	}
 }
@@ -358,13 +424,21 @@ func depositSolution(pheromone [][]float64, solution Solution, amount float64) {
 	}
 
 	for _, route := range solution.Routes {
+		if len(route.Nodes) == 0 {
+			continue
+		}
+
 		prev := 0
 		for _, node := range route.Nodes {
 			pheromone[prev][node] += amount
+
 			pheromone[node][prev] += amount
+
 			prev = node
 		}
+
 		pheromone[prev][0] += amount
+
 		pheromone[0][prev] += amount
 	}
 }
