@@ -314,9 +314,10 @@ func buildSolution(
 	}
 
 	routes := make([]vrp.Route, 0, instance.Vehicles)
+	routeNodes := make([]int, 0, len(instance.Customers))
 
 	for remaining > 0 && len(routes) < instance.Vehicles {
-		routeNodes := make([]int, 0)
+		routeNodes = routeNodes[:0]
 		load := 0
 		current := 0
 
@@ -356,7 +357,10 @@ func buildSolution(
 			remaining--
 		}
 
-		routes = append(routes, vrp.Route{Nodes: routeNodes, VehicleID: len(routes)})
+		routes = append(routes, vrp.Route{
+			Nodes:     append([]int(nil), routeNodes...),
+			VehicleID: len(routes),
+		})
 	}
 
 	if remaining > 0 {
