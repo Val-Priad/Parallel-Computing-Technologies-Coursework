@@ -62,3 +62,44 @@ func GetExperiments() []ExperimentConfig {
 		},
 	}
 }
+
+func GetLargeComparisonExperiments() []ExperimentConfig {
+	return []ExperimentConfig{
+		{
+			Name:         "large_1_60",
+			NumCustomers: 60,
+			Vehicles:     8,
+			Width:        180,
+			Height:       180,
+			CapacityMode: vrp.CapacityAuto,
+			Seed:         142,
+		},
+		{
+			Name:         "large_2_80",
+			NumCustomers: 80,
+			Vehicles:     10,
+			Width:        220,
+			Height:       220,
+			CapacityMode: vrp.CapacityAuto,
+			Seed:         143,
+		},
+		{
+			Name:         "large_3_100",
+			NumCustomers: 100,
+			Vehicles:     12,
+			Width:        260,
+			Height:       260,
+			CapacityMode: vrp.CapacityAuto,
+			Seed:         144,
+		},
+		{
+			Name:         "large_4_120",
+			NumCustomers: 120,
+			Vehicles:     14,
+			Width:        300,
+			Height:       300,
+			CapacityMode: vrp.CapacityAuto,
+			Seed:         145,
+		},
+	}
+}
