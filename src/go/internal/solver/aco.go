@@ -8,6 +8,22 @@ import (
 	"time"
 )
 
+type WorkerMemory struct {
+	demandByID []int
+	visited    []bool
+	candidates []int
+	weights    []float64
+}
+
+func NewWorkerMemory(n int, numCustomers int) *WorkerMemory {
+	return &WorkerMemory{
+		demandByID: make([]int, n),
+		visited:    make([]bool, n),
+		candidates: make([]int, 0, numCustomers),
+		weights:    make([]float64, 0, numCustomers),
+	}
+}
+
 const (
 	defaultNumAnts          = 150
 	defaultIterations       = 300
@@ -438,4 +454,149 @@ func cloneSolution(sol vrp.Solution) vrp.Solution {
 			DurationMS: sol.Metrics.DurationMS,
 		},
 	}
+}
+
+func buildSolutionOptimized(
+	instance vrp.VRPInstance,
+	pheromone [][]float64,
+	cfg ACOConfig,
+	rng *rand.Rand,
+	mem *WorkerMemory,
+) (vrp.Solution, bool) {
+	n := len(instance.Dist)
+	if n == 0 {
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
+	}
+
+	for i := 0; i < n; i++ {
+		mem.demandByID[i] = 0
+		mem.visited[i] = false
+	}
+
+	remaining := len(instance.Customers)
+	for _, c := range instance.Customers {
+		mem.demandByID[c.ID] = c.Demand
+	}
+
+	routes := make([]vrp.Route, 0, instance.Vehicles)
+
+	for remaining > 0 && len(routes) < instance.Vehicles {
+		routeNodes := make([]int, 0)
+		load := 0
+		current := 0
+
+		for {
+			mem.candidates = mem.candidates[:0]
+			for _, c := range instance.Customers {
+				id := c.ID
+				if mem.visited[id] {
+					continue
+				}
+				if load+mem.demandByID[id] <= instance.VehicleCapacity {
+					mem.candidates = append(mem.candidates, id)
+				}
+			}
+
+			if len(mem.candidates) == 0 {
+				break
+			}
+
+			next := selectNextCustomerOptimized(
+				current,
+				mem.candidates,
+				instance.Dist,
+				pheromone,
+				cfg,
+				rng,
+				&mem.weights,
+			)
+			if next == -1 {
+				break
+			}
+
+			routeNodes = append(routeNodes, next)
+			load += mem.demandByID[next]
+			current = next
+			mem.visited[next] = true
+			remaining--
+		}
+
+		routes = append(routes, vrp.Route{Nodes: routeNodes, VehicleID: len(routes)})
+	}
+
+	if remaining > 0 {
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: math.Inf(1)}, false
+	}
+
+	for len(routes) < instance.Vehicles {
+		routes = append(routes, vrp.Route{VehicleID: len(routes), Nodes: []int{}})
+	}
+
+	totalCost := 0.0
+	for _, route := range routes {
+		totalCost += computeRouteCost(route.Nodes, instance.Dist)
+	}
+
+	return vrp.Solution{Routes: routes, Cost: totalCost}, true
+}
+
+func selectNextCustomerOptimized(
+	current int,
+	candidates []int,
+	dist [][]float64,
+	pheromone [][]float64,
+	cfg ACOConfig,
+	rng *rand.Rand,
+	weights *[]float64,
+) int {
+	if len(candidates) == 0 {
+		return -1
+	}
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	w := *weights
+	if cap(w) < len(candidates) {
+		w = make([]float64, len(candidates))
+	}
+	w = w[:len(candidates)]
+	*weights = w
+
+	totalWeight := 0.0
+	for i, node := range candidates {
+		d := dist[current][node]
+		if d <= 0 {
+			d = 1e-9
+		}
+		weight := math.Pow(pheromone[current][node], cfg.Alpha) * math.Pow(1.0/d, cfg.Beta)
+		if weight <= 0 {
+			weight = 1e-12
+		}
+		w[i] = weight
+		totalWeight += weight
+	}
+
+	if totalWeight <= 0 {
+		bestNode := candidates[0]
+		bestDist := dist[current][bestNode]
+		for _, node := range candidates[1:] {
+			if dist[current][node] < bestDist {
+				bestDist = dist[current][node]
+				bestNode = node
+			}
+		}
+		return bestNode
+	}
+
+	r := rng.Float64() * totalWeight
+	acc := 0.0
+	for i, weight := range w {
+		acc += weight
+		if r <= acc {
+			return candidates[i]
+		}
+	}
+
+	return candidates[len(candidates)-1]
 }

@@ -64,6 +64,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 			rng := rand.New(rand.NewSource(localCfg.Seed))
 			n := len(instance.Dist)
 			pheromone := makeMatrix(n, n, localCfg.InitialPheromone)
+			mem := NewWorkerMemory(n, len(instance.Customers))
 
 			best := vrp.Solution{
 				Routes: []vrp.Route{},
@@ -74,7 +75,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 				ants := make([]antSolution, 0, localCfg.NumAnts)
 
 				for ant := 0; ant < localCfg.NumAnts; ant++ {
-					sol, feasible := buildSolution(instance, pheromone, localCfg, rng)
+					sol, feasible := buildSolutionOptimized(instance, pheromone, localCfg, rng, mem)
 
 					ants = append(ants, antSolution{
 						Solution: sol,

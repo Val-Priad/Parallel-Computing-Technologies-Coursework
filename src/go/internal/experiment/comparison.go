@@ -73,7 +73,7 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 
 	pacoCfg := solver.PACOConfig{
 		BaseConfig: acoCfg,
-		NumWorkers: 6,
+		NumWorkers: 12,
 	}
 	pacoSolution := solver.SolvePACO(instance, pacoCfg)
 
