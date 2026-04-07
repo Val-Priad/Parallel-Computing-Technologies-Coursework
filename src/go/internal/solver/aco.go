@@ -86,6 +86,7 @@ func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) v
 
 	n := len(instance.Dist)
 	pheromone := makeMatrix(n, n, cfg.InitialPheromone)
+	mem := NewWorkerMemory(n, len(instance.Customers))
 
 	rng := rand.New(rand.NewSource(cfg.Seed))
 
@@ -100,7 +101,7 @@ func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) v
 		ants := make([]antSolution, 0, cfg.NumAnts)
 
 		for ant := 0; ant < cfg.NumAnts; ant++ {
-			sol, feasible := buildSolution(instance, pheromone, cfg, rng)
+			sol, feasible := buildSolution(instance, pheromone, cfg, rng, mem)
 
 			ants = append(ants, antSolution{
 				Solution: sol,
@@ -217,172 +218,6 @@ func logSolutionStep(logger *logging.Logger, stepID int, sol vrp.Solution) int {
 	return stepID + 1
 }
 
-func buildSolution(
-	instance vrp.VRPInstance,
-	pheromone [][]float64,
-	cfg ACOConfig,
-	rng *rand.Rand,
-) (vrp.Solution, bool) {
-	n := len(instance.Dist)
-	if n == 0 {
-		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
-	}
-
-	demandByID := make([]int, n)
-	customers := make([]int, 0, len(instance.Customers))
-	for _, c := range instance.Customers {
-		demandByID[c.ID] = c.Demand
-		customers = append(customers, c.ID)
-	}
-
-	if len(customers) == 0 {
-		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
-	}
-	unvisited := append([]int{}, customers...)
-	routes := make([]vrp.Route, 0, instance.Vehicles)
-
-	for len(unvisited) > 0 && len(routes) < instance.Vehicles {
-		routeNodes := make([]int, 0)
-		load := 0
-		current := 0
-
-		for {
-			candidates := feasibleCustomers(unvisited, load, instance.VehicleCapacity, demandByID)
-			if len(candidates) == 0 {
-				break
-			}
-
-			next := selectNextCustomer(current, candidates, instance.Dist, pheromone, cfg, rng)
-			if next == -1 {
-				break
-			}
-
-			routeNodes = append(routeNodes, next)
-			load += demandByID[next]
-			current = next
-			unvisited = removeCustomerValue(unvisited, next)
-		}
-
-		routes = append(routes, vrp.Route{Nodes: routeNodes})
-	}
-
-	if len(unvisited) > 0 {
-		return vrp.Solution{Routes: []vrp.Route{}, Cost: math.Inf(1)}, false
-	}
-
-	for i := range routes {
-		routes[i].VehicleID = i
-	}
-
-	for len(routes) < instance.Vehicles {
-		routes = append(routes, vrp.Route{VehicleID: len(routes), Nodes: []int{}})
-	}
-
-	totalCost := 0.0
-	for _, route := range routes {
-		totalCost += computeRouteCost(route.Nodes, instance.Dist)
-	}
-
-	return vrp.Solution{
-		Routes: routes,
-		Cost:   totalCost,
-	}, true
-}
-
-func feasibleCustomers(unvisited []int, currentLoad, capacity int, demandByID []int) []int {
-	result := make([]int, 0, len(unvisited))
-	for _, node := range unvisited {
-		demand := demandByID[node]
-		if currentLoad+demand <= capacity {
-			result = append(result, node)
-		}
-	}
-	return result
-}
-
-func removeCustomerAt(values []int, index int) []int {
-	copy(values[index:], values[index+1:])
-	return values[:len(values)-1]
-}
-
-func removeCustomerValue(values []int, value int) []int {
-	for index, candidate := range values {
-		if candidate == value {
-			return removeCustomerAt(values, index)
-		}
-	}
-
-	return values
-}
-
-func selectNextCustomer(
-	current int,
-	candidates []int,
-	dist [][]float64,
-	pheromone [][]float64,
-	cfg ACOConfig,
-	rng *rand.Rand,
-) int {
-	if len(candidates) == 0 {
-		return -1
-	}
-	if len(candidates) == 1 {
-		return candidates[0]
-	}
-
-	type weightedCandidate struct {
-		Node   int
-		Weight float64
-	}
-
-	weighted := make([]weightedCandidate, 0, len(candidates))
-	totalWeight := 0.0
-
-	for _, node := range candidates {
-		d := dist[current][node]
-		if d <= 0 {
-			d = 1e-9
-		}
-
-		tau := math.Pow(pheromone[current][node], cfg.Alpha)
-		eta := math.Pow(1.0/d, cfg.Beta)
-		w := tau * eta
-
-		if w <= 0 {
-			w = 1e-12
-		}
-
-		weighted = append(weighted, weightedCandidate{
-			Node:   node,
-			Weight: w,
-		})
-		totalWeight += w
-	}
-
-	if totalWeight <= 0 {
-		bestNode := candidates[0]
-		bestDist := dist[current][bestNode]
-		for _, node := range candidates[1:] {
-			if dist[current][node] < bestDist {
-				bestDist = dist[current][node]
-				bestNode = node
-			}
-		}
-		return bestNode
-	}
-
-	r := rng.Float64() * totalWeight
-	acc := 0.0
-	for _, item := range weighted {
-		acc += item.Weight
-		if r <= acc {
-			return item.Node
-		}
-	}
-
-	return weighted[len(weighted)-1].Node
-}
-
 func evaporate(pheromone [][]float64, evaporation float64) {
 	factor := 1.0 - evaporation
 
@@ -456,7 +291,7 @@ func cloneSolution(sol vrp.Solution) vrp.Solution {
 	}
 }
 
-func buildSolutionOptimized(
+func buildSolution(
 	instance vrp.VRPInstance,
 	pheromone [][]float64,
 	cfg ACOConfig,
@@ -501,7 +336,7 @@ func buildSolutionOptimized(
 				break
 			}
 
-			next := selectNextCustomerOptimized(
+			next := selectNextCustomer(
 				current,
 				mem.candidates,
 				instance.Dist,
@@ -540,7 +375,7 @@ func buildSolutionOptimized(
 	return vrp.Solution{Routes: routes, Cost: totalCost}, true
 }
 
-func selectNextCustomerOptimized(
+func selectNextCustomer(
 	current int,
 	candidates []int,
 	dist [][]float64,

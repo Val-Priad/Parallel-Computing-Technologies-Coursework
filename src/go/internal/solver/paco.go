@@ -75,7 +75,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 				ants := make([]antSolution, 0, localCfg.NumAnts)
 
 				for ant := 0; ant < localCfg.NumAnts; ant++ {
-					sol, feasible := buildSolutionOptimized(instance, pheromone, localCfg, rng, mem)
+					sol, feasible := buildSolution(instance, pheromone, localCfg, rng, mem)
 
 					ants = append(ants, antSolution{
 						Solution: sol,
