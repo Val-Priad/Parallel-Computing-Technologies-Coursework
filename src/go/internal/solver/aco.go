@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	defaultNumAnts          = 25
-	defaultIterations       = 200
+	defaultNumAnts          = 150
+	defaultIterations       = 300
 	defaultAlpha            = 0.5
 	defaultBeta             = 1.0
 	defaultEvaporation      = 0.6

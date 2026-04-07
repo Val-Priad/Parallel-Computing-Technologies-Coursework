@@ -3,33 +3,18 @@ package solver
 import (
 	"math"
 	"math/rand"
-	"parallel-aco/internal/logging"
 	"parallel-aco/internal/vrp"
+	"runtime"
+	"sync"
 	"time"
 )
 
 type PACOConfig struct {
-	Colonies      int
-	ExchangeEvery int
-	BaseACOConfig ACOConfig
+	BaseConfig ACOConfig
+	NumWorkers int
 }
 
-type exchangeMsg struct {
-	From int
-	Best vrp.Solution
-}
-
-type colonyResult struct {
-	sol vrp.Solution
-}
-
-func SolvePACO(
-	instance vrp.VRPInstance,
-	logger *logging.Logger,
-	pacoCfg PACOConfig,
-) vrp.Solution {
-	_ = logger
-
+func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	startTime := time.Now()
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
@@ -42,141 +27,115 @@ func SolvePACO(
 		}
 	}
 
-	applyConfigDefaults(&pacoCfg.BaseACOConfig)
+	applyConfigDefaults(&cfg.BaseConfig)
 	if !validateInstance(instance) {
 		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
-	if pacoCfg.Colonies <= 0 {
-		pacoCfg.Colonies = 4
+	if cfg.NumWorkers <= 0 {
+		cfg.NumWorkers = runtime.NumCPU()
 	}
-	if pacoCfg.ExchangeEvery <= 0 {
-		pacoCfg.ExchangeEvery = 25
+	if cfg.NumWorkers > cfg.BaseConfig.NumAnts {
+		cfg.NumWorkers = cfg.BaseConfig.NumAnts
 	}
-
-	updatesCh := make(chan exchangeMsg, pacoCfg.Colonies*2)
-	inboxes := make([]chan exchangeMsg, pacoCfg.Colonies)
-	for i := range inboxes {
-		inboxes[i] = make(chan exchangeMsg, 1)
+	if cfg.NumWorkers <= 0 {
+		cfg.NumWorkers = 1
 	}
 
-	doneBroker := make(chan struct{})
-	go brokerExchanges(updatesCh, inboxes, doneBroker)
-
-	resultCh := make(chan colonyResult, pacoCfg.Colonies)
-
-	for colonyID := 0; colonyID < pacoCfg.Colonies; colonyID++ {
-		go runColony(
-			colonyID,
-			instance,
-			pacoCfg,
-			updatesCh,
-			inboxes[colonyID],
-			resultCh,
-		)
+	type result struct {
+		best vrp.Solution
 	}
 
-	best := vrp.Solution{Cost: math.Inf(1)}
-	for i := 0; i < pacoCfg.Colonies; i++ {
-		res := <-resultCh
-		if res.sol.Cost < best.Cost {
-			best = res.sol
+	results := make([]result, cfg.NumWorkers)
+	antsPerWorker := splitAnts(cfg.BaseConfig.NumAnts, cfg.NumWorkers)
+
+	var wg sync.WaitGroup
+
+	for w := 0; w < cfg.NumWorkers; w++ {
+		wg.Add(1)
+
+		go func(workerID int) {
+			defer wg.Done()
+
+			localCfg := cfg.BaseConfig
+			localCfg.Seed = cfg.BaseConfig.Seed + int64(workerID)*1000
+			localCfg.NumAnts = antsPerWorker[workerID]
+
+			rng := rand.New(rand.NewSource(localCfg.Seed))
+			n := len(instance.Dist)
+			pheromone := makeMatrix(n, n, localCfg.InitialPheromone)
+
+			best := vrp.Solution{
+				Routes: []vrp.Route{},
+				Cost:   math.Inf(1),
+			}
+
+			for iter := 0; iter < localCfg.Iterations; iter++ {
+				ants := make([]antSolution, 0, localCfg.NumAnts)
+
+				for ant := 0; ant < localCfg.NumAnts; ant++ {
+					sol, feasible := buildSolution(instance, pheromone, localCfg, rng)
+
+					ants = append(ants, antSolution{
+						Solution: sol,
+						Feasible: feasible,
+					})
+
+					if feasible && sol.Cost < best.Cost {
+						best = cloneSolution(sol)
+					}
+				}
+
+				evaporate(pheromone, localCfg.Evaporation)
+
+				for _, ant := range ants {
+					if !ant.Feasible || ant.Solution.Cost <= 0 {
+						continue
+					}
+					depositSolution(pheromone, ant.Solution, localCfg.Q/ant.Solution.Cost)
+				}
+
+				if !math.IsInf(best.Cost, 1) && best.Cost > 0 {
+					depositSolution(pheromone, best, localCfg.EliteWeight*localCfg.Q/best.Cost)
+				}
+			}
+
+			results[workerID] = result{best: best}
+		}(w)
+	}
+
+	wg.Wait()
+
+	globalBest := vrp.Solution{
+		Routes: []vrp.Route{},
+		Cost:   math.Inf(1),
+	}
+
+	for _, r := range results {
+		if r.best.Cost < globalBest.Cost {
+			globalBest = cloneSolution(r.best)
 		}
 	}
 
-	close(doneBroker)
-
-	if math.IsInf(best.Cost, 1) {
+	if math.IsInf(globalBest.Cost, 1) {
 		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
-	return solutionWithMetrics(best.Routes, best.Cost, startTime)
+	return solutionWithMetrics(globalBest.Routes, globalBest.Cost, startTime)
 }
 
-func brokerExchanges(updatesCh <-chan exchangeMsg, inboxes []chan exchangeMsg, done <-chan struct{}) {
-	best := vrp.Solution{Cost: math.Inf(1)}
+func splitAnts(total, workers int) []int {
+	result := make([]int, workers)
 
-	for {
-		select {
-		case <-done:
-			return
-		case msg := <-updatesCh:
-			if math.IsInf(msg.Best.Cost, 1) || msg.Best.Cost >= best.Cost {
-				continue
-			}
+	base := total / workers
+	rem := total % workers
 
-			best = cloneSolution(msg.Best)
-			bestMsg := exchangeMsg{From: msg.From, Best: best}
-			for colonyID, inbox := range inboxes {
-				if colonyID == msg.From {
-					continue
-				}
-				select {
-				case inbox <- bestMsg:
-				default:
-				}
-			}
-		}
-	}
-}
-
-func runColony(
-	id int,
-	instance vrp.VRPInstance,
-	pacoCfg PACOConfig,
-	updatesCh chan<- exchangeMsg,
-	inbox <-chan exchangeMsg,
-	resultCh chan<- colonyResult,
-) {
-	cfg := pacoCfg.BaseACOConfig
-	cfg.Seed += int64(id * 1000)
-
-	n := len(instance.Dist)
-	pheromone := makeMatrix(n, n, cfg.InitialPheromone)
-	rng := rand.New(rand.NewSource(cfg.Seed))
-
-	best := vrp.Solution{Cost: math.Inf(1)}
-
-	for iter := 0; iter < cfg.Iterations; iter++ {
-		ants := make([]antSolution, 0, cfg.NumAnts)
-
-		for ant := 0; ant < cfg.NumAnts; ant++ {
-			sol, feasible := buildSolution(instance, pheromone, cfg, rng)
-			if feasible && sol.Cost < best.Cost {
-				best = cloneSolution(sol)
-			}
-			ants = append(ants, antSolution{Solution: sol, Feasible: feasible})
-		}
-
-		evaporate(pheromone, cfg.Evaporation)
-
-		for _, ant := range ants {
-			if !ant.Feasible || ant.Solution.Cost <= 0 {
-				continue
-			}
-			depositSolution(pheromone, ant.Solution, cfg.Q/ant.Solution.Cost)
-		}
-
-		if !math.IsInf(best.Cost, 1) && best.Cost > 0 {
-			depositSolution(pheromone, best, cfg.EliteWeight*cfg.Q/best.Cost)
-		}
-
-		if iter%pacoCfg.ExchangeEvery == 0 && !math.IsInf(best.Cost, 1) {
-			select {
-			case updatesCh <- exchangeMsg{From: id, Best: cloneSolution(best)}:
-			default:
-			}
-
-			select {
-			case msg := <-inbox:
-				if msg.Best.Cost < best.Cost {
-					depositSolution(pheromone, msg.Best, cfg.Q/msg.Best.Cost)
-					best = cloneSolution(msg.Best)
-				}
-			default:
-			}
+	for i := 0; i < workers; i++ {
+		result[i] = base
+		if i < rem {
+			result[i]++
 		}
 	}
 
-	resultCh <- colonyResult{sol: best}
+	return result
 }

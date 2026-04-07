@@ -72,11 +72,10 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 	acoSolution := solver.SolveACO(instance, nil, acoCfg)
 
 	pacoCfg := solver.PACOConfig{
-		Colonies:      4,
-		ExchangeEvery: 20,
-		BaseACOConfig: acoCfg,
+		BaseConfig: acoCfg,
+		NumWorkers: 6,
 	}
-	pacoSolution := solver.SolvePACO(instance, nil, pacoCfg)
+	pacoSolution := solver.SolvePACO(instance, pacoCfg)
 
 	return comparisonRow{
 		Name:           exp.Name,
