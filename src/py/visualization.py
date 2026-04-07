@@ -1,28 +1,11 @@
 import json
+import math
 from pathlib import Path
 
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_hex
 
-DATA_FILE = (
-    Path(__file__).resolve().parent.resolve().parent
-    / "go"
-    / "logs"
-    / "exp_3_medium_run_1_brute_force.json"
-)
-with DATA_FILE.open("r", encoding="utf-8") as f:
-    data = json.load(f)
-
-points = {int(k): v for k, v in data["points"].items()}
-steps = data["steps"]
-
-fig, ax = plt.subplots(figsize=(8, 8))
-fig.patch.set_facecolor("#f6f7fb")
-
-xs, ys = zip(*points.values())
-client_ids = [i for i in points if i]
-max_routes = max(len(step["routes"]) for step in steps)
+LOGS_DIR = Path(__file__).resolve().parent.resolve().parent / "go" / "logs"
 
 
 def build_route_colors(route_count):
@@ -37,10 +20,7 @@ def build_route_colors(route_count):
     return [to_hex(cmap(sample)) for sample in samples]
 
 
-route_colors = build_route_colors(max_routes)
-
-
-def draw_points():
+def draw_points(ax, points, client_ids):
     client_xs = [points[i][0] for i in client_ids]
     client_ys = [points[i][1] for i in client_ids]
     depot_x, depot_y = points[0]
@@ -79,7 +59,7 @@ def draw_points():
         )
 
 
-def draw_routes(routes):
+def draw_routes(ax, routes, points, route_colors):
     for idx, route in enumerate(routes):
         color = route_colors[idx % len(route_colors)]
 
@@ -115,14 +95,12 @@ def draw_routes(routes):
             )
 
 
-def update(frame):
+def draw_step(ax, step, points, client_ids, route_colors, xs, ys):
     ax.clear()
     ax.set_facecolor("#ffffff")
 
-    step = steps[frame]
-
-    draw_points()
-    draw_routes(step["routes"])
+    draw_points(ax, points, client_ids)
+    draw_routes(ax, step["routes"], points, route_colors)
 
     ax.set_title(
         f"Step {step['step_id']} | Cost: {step['cost']:.2f}",
@@ -158,8 +136,53 @@ def update(frame):
     return ax.lines
 
 
-ani = animation.FuncAnimation(
-    fig, update, frames=len(steps), interval=1500, repeat=True
-)
+def visualize_log(data, log_name):
+    points = {int(k): v for k, v in data["points"].items()}
+    steps = data["steps"]
+    if not steps:
+        return
 
-plt.show()
+    xs, ys = zip(*points.values())
+    client_ids = [i for i in points if i]
+    max_routes = max(len(step["routes"]) for step in steps)
+    route_colors = build_route_colors(max_routes)
+
+    cols = 2
+    rows = max(1, math.ceil(len(steps) / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 7, rows * 5))
+    fig.patch.set_facecolor("#f6f7fb")
+
+    if hasattr(axes, "flat"):
+        axes_list = list(axes.flat)
+    else:
+        axes_list = [axes]
+
+    for idx, step in enumerate(steps):
+        draw_step(
+            axes_list[idx], step, points, client_ids, route_colors, xs, ys
+        )
+
+    for idx in range(len(steps), len(axes_list)):
+        axes_list[idx].axis("off")
+
+    fig.suptitle(
+        f"VRP Solution Steps | {log_name}", fontsize=18, weight="bold", y=0.995
+    )
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.98))
+
+
+def main():
+    log_files = sorted(LOGS_DIR.glob("*.json"))
+    if not log_files:
+        raise FileNotFoundError(f"No JSON log files found in {LOGS_DIR}")
+
+    for log_file in log_files:
+        with log_file.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        visualize_log(data, log_file.name)
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
