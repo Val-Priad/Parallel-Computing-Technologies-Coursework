@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 
 	"parallel-aco/internal/solver"
 	"parallel-aco/internal/vrp"
@@ -24,17 +25,17 @@ type acoTuningRow struct {
 	AverageGapPct     float64
 }
 
-func TuneACOConfig(experiments []ExperimentConfig, numWorkers int) (solver.ACOConfig, []acoTuningRow, float64) {
-	if numWorkers <= 0 {
-		numWorkers = 4
-	}
+const acoTuningWorkers = 6
+const acoConfigEvalEarlyStopMultiplier = 1.2
+
+func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTuningRow, float64) {
 
 	cases, averageGreedyCost := buildACOOnceCases(experiments)
 	if len(cases) == 0 {
 		return solver.DefaultACOConfig(), nil, 0
 	}
 
-	rows := evaluateACOConfigs(cases, averageGreedyCost, candidateACOConfigs(), numWorkers)
+	rows := evaluateACOConfigs(cases, averageGreedyCost, candidateACOConfigs())
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].FeasibleRuns != rows[j].FeasibleRuns {
 			return rows[i].FeasibleRuns > rows[j].FeasibleRuns
@@ -50,10 +51,9 @@ func TuneACOConfig(experiments []ExperimentConfig, numWorkers int) (solver.ACOCo
 
 func RunACOTuning() {
 	experiments := GetLargeComparisonExperiments()
-	numWorkers := 12
-	bestConfig, rows, averageGreedyCost := TuneACOConfig(experiments, numWorkers)
-	fmt.Printf("(parallel PACO, %d workers per candidate)\n", numWorkers)
-	printTuningResults("ACO (parallel)", bestConfig, rows, averageGreedyCost)
+	bestConfig, rows, averageGreedyCost := TuneACOConfig(experiments)
+	fmt.Printf("(sequential ACO, %d workers in config pool)\n", acoTuningWorkers)
+	printTuningResults("ACO (sequential, pooled)", bestConfig, rows, averageGreedyCost)
 }
 
 func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTuningRow, averageGreedyCost float64) {
@@ -123,126 +123,120 @@ func buildACOOnceCases(experiments []ExperimentConfig) ([]acoTuningCase, float64
 	return cases, averageGreedyCost
 }
 
-func evaluateACOConfigs(cases []acoTuningCase, averageGreedyCost float64, configs []solver.ACOConfig, numWorkers int) []acoTuningRow {
-	rows := make([]acoTuningRow, 0, len(configs))
+func evaluateACOConfigs(cases []acoTuningCase, averageGreedyCost float64, configs []solver.ACOConfig) []acoTuningRow {
+	if len(configs) == 0 {
+		return nil
+	}
+
+	workers := acoTuningWorkers
+	if workers > len(configs) {
+		workers = len(configs)
+	}
+	if workers < 1 {
+		workers = 1
+	}
+
+	jobs := make(chan solver.ACOConfig, len(configs))
+	results := make(chan acoTuningRow, len(configs))
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				results <- evaluateSingleACOConfig(cases, averageGreedyCost, job)
+			}
+		}()
+	}
 
 	for _, cfg := range configs {
-		row := acoTuningRow{Config: cfg}
-		totalCost := 0.0
-		totalDuration := 0.0
-		totalRuns := 0
+		jobs <- cfg
+	}
+	close(jobs)
 
-		for _, tc := range cases {
-			for trial := 0; trial < 3; trial++ {
-				runCfg := cfg
-				runCfg.Seed = tc.exp.Seed + int64(trial)
+	wg.Wait()
+	close(results)
 
-				pacoCfg := solver.PACOConfig{BaseConfig: runCfg, NumWorkers: numWorkers}
-				solution := solver.SolvePACO(tc.instance, pacoCfg)
-
-				if isFiniteFeasibleCost(solution.Cost) {
-					row.FeasibleRuns++
-					totalCost += solution.Cost
-				} else {
-					totalCost += tc.greedyCost * 4.0
-				}
-
-				totalDuration += solution.Metrics.DurationMS
-				totalRuns++
-			}
-		}
-
-		row.TotalRuns = totalRuns
-		if totalRuns > 0 {
-			row.AverageCost = totalCost / float64(totalRuns)
-			row.AverageDurationMS = totalDuration / float64(totalRuns)
-		}
-		if averageGreedyCost > 0 {
-			row.AverageGapPct = (row.AverageCost/averageGreedyCost - 1.0) * 100.0
-		}
-
+	rows := make([]acoTuningRow, 0, len(configs))
+	for row := range results {
 		rows = append(rows, row)
 	}
 
 	return rows
 }
 
+func evaluateSingleACOConfig(cases []acoTuningCase, averageGreedyCost float64, cfg solver.ACOConfig) acoTuningRow {
+	row := acoTuningRow{Config: cfg}
+	totalCost := 0.0
+	totalDuration := 0.0
+
+	earlyStopCost := 0.0
+	if averageGreedyCost > 0 {
+		earlyStopCost = averageGreedyCost * acoConfigEvalEarlyStopMultiplier
+	}
+
+	stopEarly := false
+	for _, tc := range cases {
+		for trial := 0; trial < 3; trial++ {
+			runCfg := cfg
+			runCfg.Seed = tc.exp.Seed + int64(trial)
+
+			solution := solver.SolveACO(tc.instance, nil, runCfg)
+
+			if isFiniteFeasibleCost(solution.Cost) {
+				row.FeasibleRuns++
+				totalCost += solution.Cost
+			} else {
+				totalCost += tc.greedyCost * 4.0
+			}
+
+			totalDuration += solution.Metrics.DurationMS
+			row.TotalRuns++
+
+			if earlyStopCost > 0 {
+				currentAvg := totalCost / float64(row.TotalRuns)
+				if currentAvg > earlyStopCost {
+					stopEarly = true
+					break
+				}
+			}
+		}
+
+		if stopEarly {
+			break
+		}
+	}
+
+	if row.TotalRuns > 0 {
+		row.AverageCost = totalCost / float64(row.TotalRuns)
+		row.AverageDurationMS = totalDuration / float64(row.TotalRuns)
+	}
+	if averageGreedyCost > 0 {
+		row.AverageGapPct = (row.AverageCost/averageGreedyCost - 1.0) * 100.0
+	}
+
+	return row
+}
+
 func candidateACOConfigs() []solver.ACOConfig {
 	base := solver.DefaultACOConfig()
-	base.Seed = 0
 
-	return []solver.ACOConfig{
-		base,
-		{
-			NumAnts:          20,
-			Iterations:       150,
-			Alpha:            0.5,
-			Beta:             1.0,
-			Evaporation:      0.60,
-			Q:                100.0,
-			InitialPheromone: 1.0,
-			EliteWeight:      1.0,
-		},
-		{
-			NumAnts:          40,
-			Iterations:       200,
-			Alpha:            0.8,
-			Beta:             2.0,
-			Evaporation:      0.35,
-			Q:                100.0,
-			InitialPheromone: 1.0,
-			EliteWeight:      1.0,
-		},
-		{
-			NumAnts:          60,
-			Iterations:       250,
-			Alpha:            1.0,
-			Beta:             3.0,
-			Evaporation:      0.30,
-			Q:                100.0,
-			InitialPheromone: 0.50,
-			EliteWeight:      1.5,
-		},
-		{
-			NumAnts:          80,
-			Iterations:       300,
-			Alpha:            1.0,
-			Beta:             4.0,
-			Evaporation:      0.25,
-			Q:                100.0,
-			InitialPheromone: 0.25,
-			EliteWeight:      2.0,
-		},
-		{
-			NumAnts:          100,
-			Iterations:       350,
-			Alpha:            1.2,
-			Beta:             3.5,
-			Evaporation:      0.20,
-			Q:                100.0,
-			InitialPheromone: 0.25,
-			EliteWeight:      2.0,
-		},
-		{
-			NumAnts:          120,
-			Iterations:       400,
-			Alpha:            1.0,
-			Beta:             4.5,
-			Evaporation:      0.20,
-			Q:                100.0,
-			InitialPheromone: 0.10,
-			EliteWeight:      2.5,
-		},
-		{
-			NumAnts:          60,
-			Iterations:       400,
-			Alpha:            1.5,
-			Beta:             2.5,
-			Evaporation:      0.40,
-			Q:                100.0,
-			InitialPheromone: 1.0,
-			EliteWeight:      1.0,
-		},
+	configs := make([]solver.ACOConfig, 0, 7)
+	seen := make(map[string]struct{})
+
+	addConfig := func(cfg solver.ACOConfig) {
+		cfg.Seed = 0
+		key := acoConfigKey(cfg)
+		if _, ok := seen[key]; ok {
+			return
+		}
+
+		seen[key] = struct{}{}
+		configs = append(configs, cfg)
+	}
+
+	presets := []solver.ACOConfig{
 		{
 			NumAnts:          80,
 			Iterations:       500,
@@ -253,7 +247,87 @@ func candidateACOConfigs() []solver.ACOConfig {
 			InitialPheromone: 0.50,
 			EliteWeight:      3.0,
 		},
+		{
+			NumAnts:          60,
+			Iterations:       250,
+			Alpha:            1.0,
+			Beta:             3.0,
+			Evaporation:      0.20,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
+		{
+			NumAnts:          90,
+			Iterations:       220,
+			Alpha:            0.9,
+			Beta:             4.2,
+			Evaporation:      0.15,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
+		{
+			NumAnts:          40,
+			Iterations:       360,
+			Alpha:            1.2,
+			Beta:             3.5,
+			Evaporation:      0.25,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
+		{
+			NumAnts:          110,
+			Iterations:       180,
+			Alpha:            0.8,
+			Beta:             4.8,
+			Evaporation:      0.18,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
+		{
+			NumAnts:          70,
+			Iterations:       300,
+			Alpha:            1.1,
+			Beta:             3.8,
+			Evaporation:      0.22,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
+		{
+			NumAnts:          120,
+			Iterations:       150,
+			Alpha:            1.0,
+			Beta:             4.5,
+			Evaporation:      0.12,
+			Q:                base.Q,
+			InitialPheromone: base.InitialPheromone,
+			EliteWeight:      base.EliteWeight,
+		},
 	}
+
+	for _, cfg := range presets {
+		addConfig(cfg)
+	}
+
+	return configs
+}
+
+func acoConfigKey(cfg solver.ACOConfig) string {
+	return fmt.Sprintf(
+		"ants=%d;iter=%d;a=%.3f;b=%.3f;evap=%.3f;q=%.3f;init=%.3f;elite=%.3f",
+		cfg.NumAnts,
+		cfg.Iterations,
+		cfg.Alpha,
+		cfg.Beta,
+		cfg.Evaporation,
+		cfg.Q,
+		cfg.InitialPheromone,
+		cfg.EliteWeight,
+	)
 }
 
 func formatACOConfig(cfg solver.ACOConfig) string {

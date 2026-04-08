@@ -25,10 +25,10 @@ func NewWorkerMemory(n int, numCustomers int) *WorkerMemory {
 }
 
 const (
-	defaultNumAnts          = 80
-	defaultIterations       = 500
-	defaultAlpha            = 1.0
-	defaultBeta             = 3.5
+	defaultNumAnts          = 90
+	defaultIterations       = 220
+	defaultAlpha            = 0.9
+	defaultBeta             = 4.2
 	defaultEvaporation      = 0.15
 	defaultQ                = 100.0
 	defaultInitialPheromone = 0.50
