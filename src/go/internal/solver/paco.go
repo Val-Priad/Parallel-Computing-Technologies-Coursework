@@ -22,7 +22,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 			Routes: []vrp.Route{},
 			Cost:   0,
 			Metrics: vrp.SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+				DurationMS: float64(time.Since(startTime).Milliseconds()),
 			},
 		}
 	}

@@ -74,7 +74,7 @@ func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) v
 			Routes: []vrp.Route{},
 			Cost:   0,
 			Metrics: vrp.SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+				DurationMS: float64(time.Since(startTime).Milliseconds()),
 			},
 		}
 	}
@@ -194,7 +194,7 @@ func solutionWithMetrics(routes []vrp.Route, cost float64, startTime time.Time) 
 		Routes: routes,
 		Cost:   cost,
 		Metrics: vrp.SearchMetrics{
-			DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+			DurationMS: float64(time.Since(startTime).Milliseconds()),
 		},
 	}
 }

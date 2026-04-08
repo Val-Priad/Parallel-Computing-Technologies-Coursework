@@ -15,7 +15,7 @@ func SolveBruteForce(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solut
 		return vrp.Solution{
 			Routes:  []vrp.Route{},
 			Cost:    0,
-			Metrics: vrp.SearchMetrics{DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6},
+			Metrics: vrp.SearchMetrics{DurationMS: float64(time.Since(startTime).Milliseconds())},
 		}
 	}
 
@@ -40,7 +40,7 @@ func SolveBruteForce(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solut
 	})
 
 	best.Metrics = vrp.SearchMetrics{
-		DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+		DurationMS: float64(time.Since(startTime).Milliseconds()),
 	}
 
 	return best

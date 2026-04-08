@@ -17,7 +17,7 @@ func SolveGreedy(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solution 
 			Routes: []vrp.Route{},
 			Cost:   0,
 			Metrics: vrp.SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+				DurationMS: math.Max(float64(time.Since(startTime).Milliseconds()), 0.001),
 			},
 		}
 	}
@@ -113,7 +113,7 @@ func SolveGreedy(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solution 
 		Routes: routes,
 		Cost:   totalCost,
 		Metrics: vrp.SearchMetrics{
-			DurationMS: float64(time.Since(startTime).Nanoseconds()) / 1e6,
+			DurationMS: math.Max(float64(time.Since(startTime).Milliseconds()), 0.001),
 		},
 	}
 }
