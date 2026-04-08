@@ -219,3 +219,4 @@ pyrightconfig.json
 
 logs
 *.csv
+typst
