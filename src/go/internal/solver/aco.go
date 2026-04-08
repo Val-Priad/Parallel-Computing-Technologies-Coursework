@@ -25,14 +25,14 @@ func NewWorkerMemory(n int, numCustomers int) *WorkerMemory {
 }
 
 const (
-	defaultNumAnts          = 150
-	defaultIterations       = 300
-	defaultAlpha            = 0.5
-	defaultBeta             = 1.0
-	defaultEvaporation      = 0.6
+	defaultNumAnts          = 80
+	defaultIterations       = 500
+	defaultAlpha            = 1.0
+	defaultBeta             = 3.5
+	defaultEvaporation      = 0.15
 	defaultQ                = 100.0
-	defaultInitialPheromone = 1.0
-	defaultEliteWeight      = 1.0
+	defaultInitialPheromone = 0.50
+	defaultEliteWeight      = 3.0
 )
 
 type ACOConfig struct {
