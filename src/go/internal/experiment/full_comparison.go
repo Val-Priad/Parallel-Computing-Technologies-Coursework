@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func Run() {
+func RunFullComparison() {
 	experiments := GetExperiments()
 
 	csvLogger, err := logging.NewCSVLogger("results.csv")
@@ -60,15 +60,13 @@ func Run() {
 			logSolution(runName, "aco", acoLogger, points, acoSolution.Metrics)
 			csvLogger.Log(runName, "aco", instance, acoSolution)
 
-			if exp.NumCustomers <= 8 {
-				bruteForceLogger := logging.NewLogger(true)
-				exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
-				fmt.Println("Brute:", exactSolution.Cost)
-				logSolution(runName, "brute_force", bruteForceLogger, points, exactSolution.Metrics)
-				csvLogger.Log(runName, "brute_force", instance, exactSolution)
-			}
+			bruteForceLogger := logging.NewLogger(true)
+			exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
+			fmt.Println("Brute:", exactSolution.Cost)
+			logSolution(runName, "brute_force", bruteForceLogger, points, exactSolution.Metrics)
+			csvLogger.Log(runName, "brute_force", instance, exactSolution)
 		}
 	}
 
-	fmt.Println("\nDone. Results saved to results.csv")
+	fmt.Println("\nDone.")
 }

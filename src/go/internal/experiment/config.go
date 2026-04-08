@@ -40,8 +40,8 @@ func generateExperiments(
 
 func GetExperiments() []ExperimentConfig {
 	return generateExperiments(
-		5,
-		6,
+		3,
+		4,
 		2,
 		func(i int) int { return 2 + (i+1)/2 },
 		func(i int) float64 {
@@ -51,7 +51,7 @@ func GetExperiments() []ExperimentConfig {
 			return float64(40 + i*20)
 		},
 		vrp.CapacityTight,
-		42,
+		67,
 	)
 }
 
@@ -63,6 +63,6 @@ func GetLargeComparisonExperiments() []ExperimentConfig {
 		func(i int) int { return 8 + i*2 },
 		func(i int) float64 { return float64(180 + i*40) },
 		vrp.CapacityAuto,
-		142,
+		5,
 	)
 }
