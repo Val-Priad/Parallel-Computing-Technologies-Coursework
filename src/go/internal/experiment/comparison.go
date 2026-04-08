@@ -8,7 +8,7 @@ import (
 )
 
 type comparisonRow struct {
-	Name           string
+	ID             string
 	Customers      int
 	Vehicles       int
 	ACOCost        float64
@@ -39,7 +39,7 @@ func RunACOvsPACOComparison() {
 		speedupText := formatSpeedup(row.ACODurationMS, row.PACODurationMS)
 
 		fmt.Printf("%-18s %10d %10d %14.2f %14.2f %14.2f %14.2f %12.2f %10s\n",
-			row.Name,
+			row.ID,
 			row.Customers,
 			row.Vehicles,
 			row.ACOCost,
@@ -50,8 +50,6 @@ func RunACOvsPACOComparison() {
 			speedupText,
 		)
 	}
-
-	fmt.Println("\nDone. Lower cost is better; speedup is ACO time divided by PACO time.")
 }
 
 func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
@@ -78,7 +76,7 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 	pacoSolution := solver.SolvePACO(instance, pacoCfg)
 
 	return comparisonRow{
-		Name:           exp.Name,
+		ID:             fmt.Sprintf("c%d_v%d_s%d", exp.NumCustomers, exp.Vehicles, exp.Seed),
 		Customers:      exp.NumCustomers,
 		Vehicles:       exp.Vehicles,
 		ACOCost:        acoSolution.Cost,

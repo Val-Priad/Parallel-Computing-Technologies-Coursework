@@ -22,7 +22,7 @@ type SearchMetrics struct {
 
 type Route struct {
 	VehicleID int
-	Nodes     []int // IDs клиентов
+	Nodes     []int
 }
 
 type Solution struct {

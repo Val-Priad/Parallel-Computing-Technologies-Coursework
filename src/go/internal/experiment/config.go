@@ -1,9 +1,10 @@
 package experiment
 
-import "parallel-aco/internal/vrp"
+import (
+	"parallel-aco/internal/vrp"
+)
 
 type ExperimentConfig struct {
-	Name         string
 	NumCustomers int
 	Vehicles     int
 	Width        float64
@@ -13,93 +14,55 @@ type ExperimentConfig struct {
 	Seed         int64
 }
 
-func GetExperiments() []ExperimentConfig {
-	return []ExperimentConfig{
-		{
-			Name:         "exp_1_easy",
-			NumCustomers: 6,
-			Vehicles:     2,
-			Width:        50,
-			Height:       50,
-			CapacityMode: vrp.CapacityTight,
-			Seed:         42,
-		},
-		{
-			Name:         "exp_2_medium",
-			NumCustomers: 8,
-			Vehicles:     3,
-			Width:        60,
-			Height:       60,
-			CapacityMode: vrp.CapacityTight,
-			Seed:         43,
-		},
-		{
-			Name:         "exp_3_hard",
-			NumCustomers: 10,
-			Vehicles:     3,
-			Width:        80,
-			Height:       80,
-			CapacityMode: vrp.CapacityTight,
-			Seed:         44,
-		},
-		{
-			Name:         "exp_4_very_hard",
-			NumCustomers: 12,
-			Vehicles:     4,
-			Width:        100,
-			Height:       100,
-			CapacityMode: vrp.CapacityTight,
-			Seed:         45,
-		},
-		{
-			Name:         "exp_5_extreme",
-			NumCustomers: 14,
-			Vehicles:     4,
-			Width:        120,
-			Height:       120,
-			CapacityMode: vrp.CapacityTight,
-			Seed:         46,
-		},
+func generateExperiments(
+	count int,
+	startCustomers, customerStep int,
+	vehiclesFn func(i int) int,
+	sizeFn func(i int) float64,
+	capacityMode vrp.CapacityMode,
+	seedStart int64,
+) []ExperimentConfig {
+	experiments := make([]ExperimentConfig, count)
+	for i := 0; i < count; i++ {
+		size := sizeFn(i)
+		experiments[i] = ExperimentConfig{
+			NumCustomers: startCustomers + i*customerStep,
+			Vehicles:     vehiclesFn(i),
+			Width:        size,
+			Height:       size,
+			CapacityMode: capacityMode,
+			Seed:         seedStart + int64(i),
+		}
 	}
+
+	return experiments
+}
+
+func GetExperiments() []ExperimentConfig {
+	return generateExperiments(
+		5,
+		6,
+		2,
+		func(i int) int { return 2 + (i+1)/2 },
+		func(i int) float64 {
+			if i == 0 {
+				return 50
+			}
+			return float64(40 + i*20)
+		},
+		vrp.CapacityTight,
+		42,
+	)
 }
 
 func GetLargeComparisonExperiments() []ExperimentConfig {
-	return []ExperimentConfig{
-		{
-			Name:         "large_1_60",
-			NumCustomers: 60,
-			Vehicles:     8,
-			Width:        180,
-			Height:       180,
-			CapacityMode: vrp.CapacityAuto,
-			Seed:         142,
-		},
-		{
-			Name:         "large_2_80",
-			NumCustomers: 80,
-			Vehicles:     10,
-			Width:        220,
-			Height:       220,
-			CapacityMode: vrp.CapacityAuto,
-			Seed:         143,
-		},
-		{
-			Name:         "large_3_100",
-			NumCustomers: 100,
-			Vehicles:     12,
-			Width:        260,
-			Height:       260,
-			CapacityMode: vrp.CapacityAuto,
-			Seed:         144,
-		},
-		{
-			Name:         "large_4_120",
-			NumCustomers: 120,
-			Vehicles:     14,
-			Width:        300,
-			Height:       300,
-			CapacityMode: vrp.CapacityAuto,
-			Seed:         145,
-		},
-	}
+	return generateExperiments(
+		4,
+		60,
+		20,
+		func(i int) int { return 8 + i*2 },
+		func(i int) float64 { return float64(180 + i*40) },
+		vrp.CapacityAuto,
+		142,
+	)
 }
