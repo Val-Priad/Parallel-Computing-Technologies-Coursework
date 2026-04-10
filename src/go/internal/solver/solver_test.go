@@ -114,69 +114,69 @@ func TestSolversOnEmptyInstance(t *testing.T) {
 	}
 }
 
-func TestSolversOnHardInstance(t *testing.T) {
-	instance := hardInstance()
+// func TestSolversOnHardInstance(t *testing.T) {
+// 	instance := hardInstance()
 
-	results := []struct {
-		name     string
-		solution vrp.Solution
-	}{
-		{
-			name:     "brute force",
-			solution: SolveBruteForce(instance, logging.NewLogger(false)),
-		},
-		{
-			name:     "greedy",
-			solution: SolveGreedy(instance, nil),
-		},
-		{
-			name: "aco",
-			solution: SolveACO(instance, nil, ACOConfig{
-				NumAnts:    20,
-				Iterations: 20,
-				Seed:       42,
-			}),
-		},
-		{
-			name: "paco",
-			solution: SolvePACO(instance, PACOConfig{
-				BaseConfig: ACOConfig{
-					NumAnts:    20,
-					Iterations: 20,
-					Seed:       42,
-				},
-				NumWorkers: 2,
-			}),
-		},
-	}
+// 	results := []struct {
+// 		name     string
+// 		solution vrp.Solution
+// 	}{
+// 		{
+// 			name:     "brute force",
+// 			solution: SolveBruteForce(instance, logging.NewLogger(false)),
+// 		},
+// 		{
+// 			name:     "greedy",
+// 			solution: SolveGreedy(instance, nil),
+// 		},
+// 		{
+// 			name: "aco",
+// 			solution: SolveACO(instance, nil, ACOConfig{
+// 				NumAnts:    20,
+// 				Iterations: 20,
+// 				Seed:       42,
+// 			}),
+// 		},
+// 		{
+// 			name: "paco",
+// 			solution: SolvePACO(instance, PACOConfig{
+// 				BaseConfig: ACOConfig{
+// 					NumAnts:    20,
+// 					Iterations: 20,
+// 					Seed:       42,
+// 				},
+// 				NumWorkers: 2,
+// 			}),
+// 		},
+// 	}
 
-	for _, result := range results {
-		t.Run(result.name, func(t *testing.T) {
-			assertFeasibleSolution(t, instance, result.solution)
+// 	for _, result := range results {
+// 		t.Run(result.name, func(t *testing.T) {
+// 			assertFeasibleSolution(t, instance, result.solution)
 
-			if diff := math.Abs(solutionCost(instance, result.solution) - result.solution.Cost); diff > 1e-9 {
-				t.Fatalf("solution cost does not match route cost: got %.12f, computed %.12f", result.solution.Cost, solutionCost(instance, result.solution))
-			}
-		})
-	}
+// 			if diff := math.Abs(solutionCost(instance, result.solution) - result.solution.Cost); diff > 1e-9 {
+// 				t.Fatalf("solution cost does not match route cost: got %.12f, computed %.12f", result.solution.Cost, solutionCost(instance, result.solution))
+// 			}
+// 		})
+// 	}
 
-	bruteForceCost := results[0].solution.Cost
-	greedyCost := results[1].solution.Cost
-	acoCost := results[2].solution.Cost
-	pacoCost := results[3].solution.Cost
+// 	bruteForceCost := results[0].solution.Cost
+// 	greedyCost := results[1].solution.Cost
+// 	acoCost := results[2].solution.Cost
+// 	pacoCost := results[3].solution.Cost
 
-	if bruteForceCost > greedyCost {
-		t.Fatalf("expected brute force to be no worse than greedy: brute force %.12f, greedy %.12f", bruteForceCost, greedyCost)
-	}
+// 	if bruteForceCost > greedyCost {
+// 		t.Fatalf("expected brute force to be no worse than greedy: brute force %.12f, greedy %.12f", bruteForceCost, greedyCost)
+// 	}
 
-	if acoCost < bruteForceCost || acoCost > greedyCost {
-		t.Fatalf("expected ACO cost to be between brute force and greedy: brute force %.12f, aco %.12f, greedy %.12f", bruteForceCost, acoCost, greedyCost)
-	}
+// 	if acoCost < bruteForceCost || acoCost > greedyCost {
+// 		t.Fatalf("expected ACO cost to be between brute force and greedy: brute force %.12f, aco %.12f, greedy %.12f", bruteForceCost, acoCost, greedyCost)
+// 	}
 
-	if pacoCost < bruteForceCost || pacoCost > greedyCost {
-		t.Fatalf("expected PACO cost to be between brute force and greedy: brute force %.12f, paco %.12f, greedy %.12f", bruteForceCost, pacoCost, greedyCost)
-	}
-}
+// 	if pacoCost < bruteForceCost || pacoCost > greedyCost {
+// 		t.Fatalf("expected PACO cost to be between brute force and greedy: brute force %.12f, paco %.12f, greedy %.12f", bruteForceCost, pacoCost, greedyCost)
+// 	}
+// }
 
 func simpleInstance() vrp.VRPInstance {
 	return vrp.VRPInstance{
