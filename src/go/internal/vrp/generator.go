@@ -31,28 +31,7 @@ type GeneratorConfig struct {
 }
 
 func GenerateInstance(cfg GeneratorConfig) ([]Point, VRPInstance) {
-	if cfg.Seed == 0 {
-		cfg.Seed = time.Now().UnixNano()
-	}
-
-	if cfg.MinDemand <= 0 {
-		cfg.MinDemand = 1
-	}
-	if cfg.MaxDemand < cfg.MinDemand {
-		cfg.MaxDemand = cfg.MinDemand
-	}
-	if cfg.Width <= 0 {
-		cfg.Width = 100
-	}
-	if cfg.Height <= 0 {
-		cfg.Height = 100
-	}
-	if cfg.CapacitySlack <= 0 {
-		cfg.CapacitySlack = 1.15
-	}
-	if cfg.CapacityMode == "" {
-		cfg.CapacityMode = CapacityAuto
-	}
+	applyGeneratorDefaults(&cfg)
 
 	rng := rand.New(rand.NewSource(cfg.Seed))
 
@@ -99,6 +78,31 @@ func GenerateInstance(cfg GeneratorConfig) ([]Point, VRPInstance) {
 	}
 
 	return points, instance
+}
+
+func applyGeneratorDefaults(cfg *GeneratorConfig) {
+	if cfg.Seed == 0 {
+		cfg.Seed = time.Now().UnixNano()
+	}
+
+	if cfg.MinDemand <= 0 {
+		cfg.MinDemand = 1
+	}
+	if cfg.MaxDemand < cfg.MinDemand {
+		cfg.MaxDemand = cfg.MinDemand
+	}
+	if cfg.Width <= 0 {
+		cfg.Width = 100
+	}
+	if cfg.Height <= 0 {
+		cfg.Height = 100
+	}
+	if cfg.CapacitySlack <= 0 {
+		cfg.CapacitySlack = 1.15
+	}
+	if cfg.CapacityMode == "" {
+		cfg.CapacityMode = CapacityAuto
+	}
 }
 
 func computeCapacity(cfg GeneratorConfig, totalDemand, maxDemand int) int {
