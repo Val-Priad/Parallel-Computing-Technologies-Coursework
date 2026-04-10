@@ -1,9 +1,10 @@
-
 #import "@preview/algorithmic:1.0.7"
 #import algorithmic: algorithm-figure, style-algorithm
 #show: style-algorithm
 
 #counter(figure.where(kind: "algorithm")).update(0)
+
+#pagebreak()
 
 #algorithm-figure(
   supplement: "ACO",
@@ -25,7 +26,7 @@
           Return[InfeasibleSolution()]
         })
 
-        Comment[Initialize pheromone trails and the best solution tracker.]
+        Comment[Initialize search state]
         Assign[`n`][length(instance.Dist)]
         Assign[`pheromone`][Matrix(n, n, cfg.InitialPheromone)]
         Assign[`rng`][Random(cfg.Seed)]
@@ -34,7 +35,7 @@
         Assign[`best.routes`][[]]
 
         For([`iter = 1` to `cfg.Iterations`], {
-          Comment[Build one candidate solution for each ant in the colony.]
+          Comment[Phase 1: construct one candidate per ant]
           Assign[`ants`][[]]
 
           For([`k = 1` to `cfg.NumAnts`], {
@@ -47,8 +48,10 @@
             })
           })
 
+          Comment[Phase 2: evaporate stale pheromone]
           Call[Evaporate][pheromone, cfg.Evaporation]
 
+          Comment[Phase 3: reinforce feasible ant solutions]
           For([`each ant in ants`], {
             If(`ant.feasible AND ant.solution.cost > 0`, {
               Call[Deposit-Solution][
@@ -59,6 +62,7 @@
             })
           })
 
+          Comment[Phase 4: apply elite reinforcement from global best]
           If(`best.cost < +∞ AND best.cost > 0`, {
             Call[Deposit-Solution][
               pheromone,
@@ -74,6 +78,8 @@
   },
 )
 
+#pagebreak()
+
 #algorithm-figure(
   supplement: "ACO",
   "Solution Construction",
@@ -86,15 +92,15 @@
       {
         Assign[`remaining`][length(instance.Customers)]
         Assign[`visited`][all false]
-
         Assign[`routes`][[]]
 
-        Comment[Start a new vehicle route and keep adding feasible customers.]
+        Comment[Construct routes until all customers are served or vehicles are exhausted]
         While(`remaining > 0 AND length(routes) < instance.Vehicles`, {
           Assign[`route`][[]]
           Assign[`load`][0]
           Assign[`current`][0]
 
+          Comment[Greedily extend current route using probabilistic ACO choice]
           While(`true`, {
             Assign[`candidates`][[]]
 
@@ -125,13 +131,15 @@
 
             Line[Append `next` to `route`]
 
-            Assign[`load`][`load + demand(next)`]
+            Assign[`load`][`load + Demand(next)`]
             Assign[`current`][next]
             Assign[`visited[next]`][true]
             Assign[`remaining`][`remaining - 1`]
           })
 
-          Line[Append `route` to `routes`]
+          If(`route != []`, {
+            Line[Append `route` to `routes`]
+          })
         })
 
         If(`remaining > 0`, {
@@ -140,11 +148,17 @@
 
         Assign[`cost`][Compute-Total-Cost(routes)]
 
-        Return[`routes, cost`, true]
+        Assign[`solution.routes`][routes]
+        Assign[`solution.cost`][cost]
+
+        Return[`solution`, true]
       },
     )
   },
 )
+
+#pagebreak()
+
 #algorithm-figure(
   supplement: "ACO",
   "Next Customer Selection",
@@ -163,7 +177,7 @@
           Return[candidates[0]]
         })
 
-        Comment[Compute attraction weights from pheromone and distance.]
+        Comment[Attraction model: $w_j = tau_(i,j)^alpha dot eta_(i,j)^beta$]
         Assign[`weights`][[]]
         Assign[`total`][0]
 
@@ -187,7 +201,8 @@
         If(`total <= 0`, {
           Return[Nearest-Neighbor(current, candidates)]
         })
-        Comment[Use roulette-wheel sampling to pick the next customer.]
+
+        Comment[Sample next node with roulette-wheel selection]
 
         Assign[`r`][RandomFloat(0, total)]
         Assign[`acc`][0]
@@ -206,6 +221,8 @@
   },
 )
 
+#pagebreak()
+
 #algorithm-figure(
   supplement: "ACO",
   "Pheromone Evaporation",
@@ -216,7 +233,8 @@
       "Evaporate",
       ("pheromone", "rate"),
       {
-        Comment[Decay all pheromone trails to reduce the influence of older solutions.]
+        Comment[Uniform decay to reduce influence of old paths]
+        Assign[`n`][length(pheromone)]
         Assign[`factor`][`1 - rate`]
 
         For([`i = 0` to `n-1`], {
@@ -234,6 +252,8 @@
   },
 )
 
+#pagebreak()
+
 #algorithm-figure(
   supplement: "ACO",
   "Pheromone Update",
@@ -244,7 +264,7 @@
       "Deposit-Solution",
       ("pheromone", "solution", "amount"),
       {
-        Comment[Reinforce the edges used by the selected solution.]
+        Comment[Reinforce each traversed edge in both directions]
         If(`amount <= 0`, {
           Return[]
         })
@@ -254,13 +274,13 @@
             Assign[`prev`][0]
 
             For([`each node in route`], {
-              Assign[`pheromone[prev][node]`][`+ amount`]
-              Assign[`pheromone[node][prev]`][`+ amount`]
+              Assign[`pheromone[prev][node]`][`pheromone[prev][node] + amount`]
+              Assign[`pheromone[node][prev]`][`pheromone[node][prev] + amount`]
               Assign[`prev`][node]
             })
 
-            Assign[`pheromone[prev][0]`][`+ amount`]
-            Assign[`pheromone[0][prev]`][`+ amount`]
+            Assign[`pheromone[prev][0]`][`pheromone[prev][0] + amount`]
+            Assign[`pheromone[0][prev]`][`pheromone[0][prev] + amount`]
           })
         })
       },

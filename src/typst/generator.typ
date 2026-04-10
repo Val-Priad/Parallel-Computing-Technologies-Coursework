@@ -14,10 +14,10 @@
       {
         Call[Apply-Generator-Defaults][cfg]
 
-        Comment[Initialize random generator]
+        Comment[Initialize random source and base geometry]
         Assign[`rng`][Random(cfg.seed)]
 
-        Comment[Create depot at center]
+        Comment[Place depot at the map center]
         Assign[`depot.id`][0]
         Assign[`depot.x`][`cfg.Width / 2`]
         Assign[`depot.y`][`cfg.Height / 2`]
@@ -28,7 +28,7 @@
         Assign[`totalDemand`][0]
         Assign[`maxDemand`][0]
 
-        Comment[Generate customers]
+        Comment[Generate customers and aggregate demand statistics]
         For([`i = 1` to `cfg.NumCustomers`], {
           Assign[`d`][RandomInt(cfg.MinDemand, cfg.MaxDemand)]
           Assign[`x`][RandomFloat(0, cfg.Width)]
@@ -40,16 +40,16 @@
             Assign[`maxDemand`][d]
           })
 
-          Line[Append $(i, x, y, d)$ to `points`]
+          Line[Create customer $(i, x, y, d)$ and append to `points`]
         })
 
-        Comment[Compute vehicle capacity]
+        Comment[Choose vehicle capacity according to selected policy]
         Assign[`capacity`][Compute-Capacity(cfg, totalDemand, maxDemand)]
 
-        Comment[Build distance matrix]
+        Comment[Build full pairwise distance matrix]
         Assign[`dist`][Build-Distance-Matrix(points)]
 
-        Comment[Construct VRP instance]
+        Comment[Assemble final VRP instance]
         Assign[`instance.depot`][`points[0]`]
         Assign[`instance.customers`][`points[1..]`]
         Assign[`instance.vehicles`][`cfg.Vehicles`]
@@ -63,6 +63,8 @@
   },
 )
 
+#pagebreak()
+
 #algorithm-figure(
   supplement: "Generator",
   "Vehicle Capacity Computation",
@@ -73,6 +75,7 @@
       "Compute-Capacity",
       ("cfg", "totalDemand", "maxDemand"),
       {
+        Comment[Handle degenerate configurations first]
         If(`totalDemand <= 0`, {
           Return[1]
         })
@@ -83,7 +86,7 @@
 
         Assign[`required`][ceil(totalDemand / cfg.Vehicles)]
 
-        Comment[Select capacity strategy]
+        Comment[Policy-dependent capacity proposal]
 
         IfElseChain(
           `cfg.CapacityMode = TIGHT`,
@@ -106,7 +109,7 @@
           },
         )
 
-        Comment[Ensure feasibility constraints]
+        Comment[Feasibility guards: each vehicle must carry average and max demand]
 
         If(`capacity < required`, {
           Assign[`capacity`][required]
@@ -121,6 +124,9 @@
     )
   },
 )
+
+#pagebreak()
+
 #algorithm-figure(
   supplement: "Generator",
   "Distance Matrix Construction",
@@ -132,10 +138,12 @@
       "points",
       {
         Assign[`n`][length(points)]
+        Assign[`dist`][Matrix(n, n, 0)]
 
         For([`i = 0` to `n - 1`], {
-          For([`j = 0` to `n - 1`], {
+          For([`j = i` to `n - 1`], {
             Assign[`dist[i][j]`][Distance(points[i], points[j])]
+            Assign[`dist[j][i]`][`dist[i][j]`]
           })
         })
 
@@ -144,6 +152,9 @@
     )
   },
 )
+
+#pagebreak()
+
 #algorithm-figure(
   supplement: "Generator",
   "Euclidean Distance",
@@ -154,6 +165,7 @@
       "Distance",
       ("a", "b"),
       {
+        Comment[Euclidean metric in 2D plane]
         Return[`sqrt((a.x - b.x)^2 + (a.y - b.y)^2)`]
       },
     )

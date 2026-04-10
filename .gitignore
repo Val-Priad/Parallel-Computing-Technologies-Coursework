@@ -220,3 +220,4 @@ pyrightconfig.json
 logs
 *.csv
 *.pdf
+*.png
