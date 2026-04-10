@@ -19,11 +19,9 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
 		return vrp.Solution{
-			Routes: []vrp.Route{},
-			Cost:   0,
-			Metrics: vrp.SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Milliseconds()),
-			},
+			Routes:     []vrp.Route{},
+			Cost:       0,
+			DurationMS: float64(time.Since(startTime).Milliseconds()),
 		}
 	}
 

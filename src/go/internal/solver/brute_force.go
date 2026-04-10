@@ -13,9 +13,9 @@ func SolveBruteForce(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solut
 
 	if n == 0 {
 		return vrp.Solution{
-			Routes:  []vrp.Route{},
-			Cost:    0,
-			Metrics: vrp.SearchMetrics{DurationMS: float64(time.Since(startTime).Milliseconds())},
+			Routes:     []vrp.Route{},
+			Cost:       0,
+			DurationMS: float64(time.Since(startTime).Milliseconds()),
 		}
 	}
 
@@ -39,9 +39,7 @@ func SolveBruteForce(instance vrp.VRPInstance, logger *logging.Logger) vrp.Solut
 		findBestPartition(order, k, capacity, demandByID, dist, logger, &stepID, &best)
 	})
 
-	best.Metrics = vrp.SearchMetrics{
-		DurationMS: float64(time.Since(startTime).Milliseconds()),
-	}
+	best.DurationMS = float64(time.Since(startTime).Milliseconds())
 
 	return best
 }

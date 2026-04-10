@@ -191,7 +191,7 @@ func evaluateSingleACOConfig(cases []acoTuningCase, averageGreedyCost float64, c
 				totalCost += tc.greedyCost * 4.0
 			}
 
-			totalDuration += solution.Metrics.DurationMS
+			totalDuration += solution.DurationMS
 			row.TotalRuns++
 
 			if earlyStopCost > 0 {

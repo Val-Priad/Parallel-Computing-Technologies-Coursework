@@ -71,11 +71,9 @@ func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) v
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
 		return vrp.Solution{
-			Routes: []vrp.Route{},
-			Cost:   0,
-			Metrics: vrp.SearchMetrics{
-				DurationMS: float64(time.Since(startTime).Milliseconds()),
-			},
+			Routes:     []vrp.Route{},
+			Cost:       0,
+			DurationMS: float64(time.Since(startTime).Milliseconds()),
 		}
 	}
 
@@ -191,11 +189,9 @@ func validateInstance(instance vrp.VRPInstance) bool {
 
 func solutionWithMetrics(routes []vrp.Route, cost float64, startTime time.Time) vrp.Solution {
 	return vrp.Solution{
-		Routes: routes,
-		Cost:   cost,
-		Metrics: vrp.SearchMetrics{
-			DurationMS: float64(time.Since(startTime).Milliseconds()),
-		},
+		Routes:     routes,
+		Cost:       cost,
+		DurationMS: float64(time.Since(startTime).Milliseconds()),
 	}
 }
 
@@ -283,11 +279,9 @@ func cloneSolution(sol vrp.Solution) vrp.Solution {
 	}
 
 	return vrp.Solution{
-		Routes: clonedRoutes,
-		Cost:   sol.Cost,
-		Metrics: vrp.SearchMetrics{
-			DurationMS: sol.Metrics.DurationMS,
-		},
+		Routes:     clonedRoutes,
+		Cost:       sol.Cost,
+		DurationMS: sol.DurationMS,
 	}
 }
 

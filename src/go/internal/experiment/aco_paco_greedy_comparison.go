@@ -94,9 +94,9 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 		GreedyCost:       greedySolution.Cost,
 		ACOCost:          acoSolution.Cost,
 		PACOCost:         pacoSolution.Cost,
-		GreedyDurationMS: greedySolution.Metrics.DurationMS,
-		ACODurationMS:    acoSolution.Metrics.DurationMS,
-		PACODurationMS:   pacoSolution.Metrics.DurationMS,
+		GreedyDurationMS: greedySolution.DurationMS,
+		ACODurationMS:    acoSolution.DurationMS,
+		PACODurationMS:   pacoSolution.DurationMS,
 	}
 }
 

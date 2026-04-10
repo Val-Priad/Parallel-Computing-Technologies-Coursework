@@ -17,9 +17,9 @@ func RunFullComparison() {
 	}
 	defer csvLogger.Close()
 
-	logSolution := func(runName, algo string, logger *logging.Logger, points []vrp.Point, metrics vrp.SearchMetrics) {
+	logSolution := func(runName, algo string, logger *logging.Logger, points []vrp.Point, durationMS float64) {
 		logPath := filepath.Join("logs", fmt.Sprintf("%s_%s.json", runName, algo))
-		if err := logger.SaveToFile(logPath, points, metrics); err != nil {
+		if err := logger.SaveToFile(logPath, points, durationMS); err != nil {
 			fmt.Printf("Failed to save %s log: %v\n", algo, err)
 		}
 	}
@@ -51,19 +51,19 @@ func RunFullComparison() {
 			greedyLogger := logging.NewLogger(true)
 			greedySolution := solver.SolveGreedy(instance, greedyLogger)
 			fmt.Println("Greedy:", greedySolution.Cost)
-			logSolution(runName, "greedy", greedyLogger, points, greedySolution.Metrics)
+			logSolution(runName, "greedy", greedyLogger, points, greedySolution.DurationMS)
 			csvLogger.Log(runName, "greedy", instance, greedySolution)
 
 			acoLogger := logging.NewLogger(true)
 			acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
 			fmt.Println("ACO:", acoSolution.Cost)
-			logSolution(runName, "aco", acoLogger, points, acoSolution.Metrics)
+			logSolution(runName, "aco", acoLogger, points, acoSolution.DurationMS)
 			csvLogger.Log(runName, "aco", instance, acoSolution)
 
 			bruteForceLogger := logging.NewLogger(true)
 			exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
 			fmt.Println("Brute:", exactSolution.Cost)
-			logSolution(runName, "brute_force", bruteForceLogger, points, exactSolution.Metrics)
+			logSolution(runName, "brute_force", bruteForceLogger, points, exactSolution.DurationMS)
 			csvLogger.Log(runName, "brute_force", instance, exactSolution)
 		}
 	}
