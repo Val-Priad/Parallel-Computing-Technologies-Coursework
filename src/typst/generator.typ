@@ -14,10 +14,10 @@
       {
         Call[Apply-Generator-Defaults][cfg]
 
-        Comment[Initialize random source and base geometry]
+        Comment[Initialization]
         Assign[`rng`][Random(cfg.seed)]
 
-        Comment[Place depot at the map center]
+        Comment[Locate depot at map center]
         Assign[`depot.id`][0]
         Assign[`depot.x`][`cfg.Width / 2`]
         Assign[`depot.y`][`cfg.Height / 2`]
@@ -28,7 +28,7 @@
         Assign[`totalDemand`][0]
         Assign[`maxDemand`][0]
 
-        Comment[Generate customers and aggregate demand statistics]
+        Comment[Generate customers and update demand statistics]
         For([`i = 1` to `cfg.NumCustomers`], {
           Assign[`d`][RandomInt(cfg.MinDemand, cfg.MaxDemand)]
           Assign[`x`][RandomFloat(0, cfg.Width)]
@@ -40,16 +40,16 @@
             Assign[`maxDemand`][d]
           })
 
-          Line[Create customer $(i, x, y, d)$ and append to `points`]
+          Line[append customer $(i, x, y, d)$ to `points`]
         })
 
-        Comment[Choose vehicle capacity according to selected policy]
+        Comment[Compute vehicle capacity under selected policy]
         Assign[`capacity`][Compute-Capacity(cfg, totalDemand, maxDemand)]
 
-        Comment[Build full pairwise distance matrix]
+        Comment[Construct pairwise distance matrix]
         Assign[`dist`][Build-Distance-Matrix(points)]
 
-        Comment[Assemble final VRP instance]
+        Comment[Assemble VRP instance]
         Assign[`instance.depot`][`points[0]`]
         Assign[`instance.customers`][`points[1..]`]
         Assign[`instance.vehicles`][`cfg.Vehicles`]
@@ -75,7 +75,7 @@
       "Compute-Capacity",
       ("cfg", "totalDemand", "maxDemand"),
       {
-        Comment[Handle degenerate configurations first]
+        Comment[Degenerate cases]
         If(`totalDemand <= 0`, {
           Return[1]
         })
@@ -109,7 +109,7 @@
           },
         )
 
-        Comment[Feasibility guards: each vehicle must carry average and max demand]
+        Comment[Feasibility guards]
 
         If(`capacity < required`, {
           Assign[`capacity`][required]
@@ -140,8 +140,8 @@
         Assign[`n`][length(points)]
         Assign[`dist`][Matrix(n, n, 0)]
 
-        For([`i = 0` to `n - 1`], {
-          For([`j = i` to `n - 1`], {
+        For([`i = 0` to `n-1`], {
+          For([`j = i` to `n-1`], {
             Assign[`dist[i][j]`][Distance(points[i], points[j])]
             Assign[`dist[j][i]`][`dist[i][j]`]
           })
@@ -165,9 +165,11 @@
       "Distance",
       ("a", "b"),
       {
-        Comment[Euclidean metric in 2D plane]
+        Comment[Euclidean metric in the plane]
         Return[`sqrt((a.x - b.x)^2 + (a.y - b.y)^2)`]
       },
     )
   },
 )
+
+#pagebreak()

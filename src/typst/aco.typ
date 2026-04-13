@@ -16,63 +16,58 @@
       "Solve-ACO",
       ("instance", "cfg"),
       {
-        If(`instance.Customers = [] OR instance.Vehicles = 0`, {
-          Return[EmptySolution()]
-        })
-
         Call[Apply-Config-Defaults][cfg]
 
         If(`NOT Validate-Instance(instance)`, {
           Return[InfeasibleSolution()]
         })
 
-        Comment[Initialize search state]
+        Comment[Initialization]
         Assign[`n`][length(instance.Dist)]
-        Assign[`pheromone`][Matrix(n, n, cfg.InitialPheromone)]
+        Assign[`τ`][Matrix(n, n, cfg.InitialPheromone)]
         Assign[`rng`][Random(cfg.Seed)]
 
-        Assign[`best.cost`][+∞]
-        Assign[`best.routes`][[]]
+        Assign[`best_solution`][InfeasibleSolution()]
 
         For([`iter = 1` to `cfg.Iterations`], {
-          Comment[Phase 1: construct one candidate per ant]
-          Assign[`ants`][[]]
+          Comment[Phase 1: solution construction]
+          Assign[`ant_solutions`][[]]
 
           For([`k = 1` to `cfg.NumAnts`], {
-            Assign[`sol, feasible`][Build-Solution(instance, pheromone, cfg, rng)]
+            Assign[`candidate, feasible`][Build-Solution(instance, τ, cfg, rng)]
 
-            Line[Append `sol, feasible` to `ants`]
+            Line[append `candidate, feasible` to `ant_solutions`]
 
-            If(`feasible AND sol.cost < best.cost`, {
-              Assign[`best`][sol]
+            If(`feasible AND candidate.cost < best_solution.cost`, {
+              Assign[`best_solution`][candidate]
             })
           })
 
-          Comment[Phase 2: evaporate stale pheromone]
-          Call[Evaporate][pheromone, cfg.Evaporation]
+          Comment[Phase 2: pheromone evaporation]
+          Call[Evaporate][τ, cfg.Evaporation]
 
-          Comment[Phase 3: reinforce feasible ant solutions]
-          For([`each ant in ants`], {
+          Comment[Phase 3: pheromone update from iteration solutions]
+          For([`each ant in ant_solutions`], {
             If(`ant.feasible AND ant.solution.cost > 0`, {
               Call[Deposit-Solution][
-                pheromone,
+                τ,
                 ant.solution,
                 `cfg.Q / ant.solution.cost`
               ]
             })
           })
 
-          Comment[Phase 4: apply elite reinforcement from global best]
-          If(`best.cost < +∞ AND best.cost > 0`, {
+          Comment[Phase 4: elite reinforcement by global best]
+          If(`best_solution.cost < +∞ AND best_solution.cost > 0`, {
             Call[Deposit-Solution][
-              pheromone,
-              best,
-              `cfg.EliteWeight * cfg.Q / best.cost`
+              τ,
+              best_solution,
+              `cfg.EliteWeight * cfg.Q / best_solution.cost`
             ]
           })
         })
 
-        Return[best]
+        Return[best_solution]
       },
     )
   },
@@ -88,30 +83,26 @@
 
     Procedure(
       "Build-Solution",
-      ("instance", "pheromone", "cfg", "rng"),
+      ("instance", "τ", "cfg", "rng"),
       {
         Assign[`remaining`][length(instance.Customers)]
         Assign[`visited`][all false]
         Assign[`routes`][[]]
 
-        Comment[Construct routes until all customers are served or vehicles are exhausted]
+        Comment[Construct routes until all customers are served or no vehicle remains]
         While(`remaining > 0 AND length(routes) < instance.Vehicles`, {
           Assign[`route`][[]]
           Assign[`load`][0]
           Assign[`current`][0]
 
-          Comment[Greedily extend current route using probabilistic ACO choice]
-          While(`true`, {
+          Comment[Extend current route while feasible customers exist]
+          While(`exists c in instance.Customers such that NOT visited[c.id] AND load + c.demand <= instance.capacity`, {
             Assign[`candidates`][[]]
 
             For([`each c in instance.Customers`], {
               If(`NOT visited[c.id] AND load + c.demand <= instance.capacity`, {
-                Line[Append `c.id` to `candidates`]
+                Line[append `c.id` to `candidates`]
               })
-            })
-
-            If(`candidates = []`, {
-              Break
             })
 
             Assign[`next`][
@@ -119,7 +110,7 @@
               current,
               candidates,
               instance.Dist,
-              pheromone,
+              τ,
               cfg,
               rng
               )
@@ -129,7 +120,7 @@
               Break
             })
 
-            Line[Append `next` to `route`]
+            Line[append `next` to `route`]
 
             Assign[`load`][`load + Demand(next)`]
             Assign[`current`][next]
@@ -138,7 +129,7 @@
           })
 
           If(`route != []`, {
-            Line[Append `route` to `routes`]
+            Line[append `route` to `routes`]
           })
         })
 
@@ -167,7 +158,7 @@
 
     Function(
       "Select-Next",
-      ("current", "candidates", "dist", "pheromone", "cfg", "rng"),
+      ("current", "candidates", "dist", "τ", "cfg", "rng"),
       {
         If(`length(candidates) = 0`, {
           Return[-1]
@@ -177,24 +168,26 @@
           Return[candidates[0]]
         })
 
-        Comment[Attraction model: $w_j = tau_(i,j)^alpha dot eta_(i,j)^beta$]
+        Comment[Attraction model: $w_j = τ_(i,j)^α · η_(i,j)^β$, with $η_(i,j) = 1 / d_(i,j)$]
         Assign[`weights`][[]]
         Assign[`total`][0]
 
         For([`each j in candidates`], {
-          Assign[`d`][dist[current][j]]
+          Assign[`d_(i,j)`][dist[current][j]]
 
-          If(`d <= 0`, {
-            Assign[`d`][ε]
+          If(`d_(i,j) <= 0`, {
+            Assign[`d_(i,j)`][ε]
           })
 
-          Assign[`w`][`(pheromone[current][j])^cfg.Alpha * (1 / d)^cfg.Beta`]
+          Assign[`τ_(i,j)`][`τ[current][j]`]
+          Assign[`η_(i,j)`][`1 / d_(i,j)`]
+          Assign[`w`][`(τ_(i,j))^cfg.Alpha * (η_(i,j))^cfg.Beta`]
 
           If(`w <= 0`, {
             Assign[`w`][ε]
           })
 
-          Line[Append `w` to `weights`]
+          Line[append `w` to `weights`]
           Assign[`total`][`total + w`]
         })
 
@@ -202,7 +195,7 @@
           Return[Nearest-Neighbor(current, candidates)]
         })
 
-        Comment[Sample next node with roulette-wheel selection]
+        Comment[Roulette-wheel sampling]
 
         Assign[`r`][RandomFloat(0, total)]
         Assign[`acc`][0]
@@ -233,7 +226,7 @@
       "Evaporate",
       ("pheromone", "rate"),
       {
-        Comment[Uniform decay to reduce influence of old paths]
+        Comment[Uniform evaporation of all trail values]
         Assign[`n`][length(pheromone)]
         Assign[`factor`][`1 - rate`]
 
@@ -264,10 +257,7 @@
       "Deposit-Solution",
       ("pheromone", "solution", "amount"),
       {
-        Comment[Reinforce each traversed edge in both directions]
-        If(`amount <= 0`, {
-          Return[]
-        })
+        Comment[Reinforce each traversed edge symmetrically]
 
         For([`each route in solution.routes`], {
           If(`route != []`, {
