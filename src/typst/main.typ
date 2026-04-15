@@ -6,6 +6,6 @@
     right: 0.5cm,
   ),
 )
-#include "generator.typ"
-#include "aco.typ"
-#include "paco.typ"
+#include "chapters/generator.typ"
+#include "chapters/aco.typ"
+#include "chapters/paco.typ"
