@@ -30,15 +30,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
-	if cfg.NumWorkers <= 0 {
-		cfg.NumWorkers = runtime.NumCPU()
-	}
-	if cfg.NumWorkers > cfg.BaseConfig.NumAnts {
-		cfg.NumWorkers = cfg.BaseConfig.NumAnts
-	}
-	if cfg.NumWorkers <= 0 {
-		cfg.NumWorkers = 1
-	}
+	cfg.NumWorkers = resolvePACOWorkers(cfg.NumWorkers, cfg.BaseConfig.NumAnts)
 
 	type result struct {
 		best vrp.Solution
@@ -121,6 +113,20 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	}
 
 	return solutionWithMetrics(globalBest.Routes, globalBest.Cost, startTime)
+}
+
+func resolvePACOWorkers(numWorkers, numAnts int) int {
+	if numWorkers <= 0 {
+		numWorkers = runtime.NumCPU()
+	}
+	if numWorkers > numAnts {
+		numWorkers = numAnts
+	}
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
+
+	return numWorkers
 }
 
 func splitAnts(total, workers int) []int {
