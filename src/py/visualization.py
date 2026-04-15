@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 LOGS_DIR = Path(__file__).resolve().parent.parent / "go" / "logs"
+SOLUTIONS_DIR = Path(__file__).resolve().parent / "solutions"
 
 
 def build_colors(n):
@@ -84,11 +85,16 @@ def visualize(data, name):
     for ax in axes[len(steps) :]:
         ax.set_visible(False)
 
-    fig.suptitle(f"VRP Solution | {name}", fontsize=16)
+    fig.suptitle(f"VRP Solution\n{name}", fontsize=16)
+
+    output_path = SOLUTIONS_DIR / f"{Path(name).stem}.png"
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
 
 
 def main():
     files = sorted(LOGS_DIR.glob("*.json"))
+    SOLUTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     if not files:
         raise FileNotFoundError("No logs found")
@@ -98,8 +104,6 @@ def main():
             data = json.load(fp)
 
         visualize(data, f.name)
-
-    plt.show()
 
 
 if __name__ == "__main__":
