@@ -48,12 +48,6 @@ func RunFullComparison() {
 				CapacityMode: exp.CapacityMode,
 			})
 
-			greedyLogger := logging.NewLogger(true)
-			greedySolution := solver.SolveGreedy(instance, greedyLogger)
-			fmt.Println("Greedy:", greedySolution.Cost)
-			logSolution(runName, "greedy", greedyLogger, points, greedySolution.DurationMS)
-			csvLogger.Log(runName, "greedy", instance, greedySolution)
-
 			acoLogger := logging.NewLogger(true)
 			acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
 			fmt.Println("ACO:", acoSolution.Cost)

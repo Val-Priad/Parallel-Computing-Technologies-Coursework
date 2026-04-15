@@ -433,3 +433,20 @@ func selectNextCustomer(
 
 	return candidates[len(candidates)-1]
 }
+
+func computeRouteCost(nodes []int, dist [][]float64) float64 {
+	if len(nodes) == 0 {
+		return 0
+	}
+
+	cost := 0.0
+	prev := 0
+
+	for _, node := range nodes {
+		cost += dist[prev][node]
+		prev = node
+	}
+
+	cost += dist[prev][0]
+	return cost
+}

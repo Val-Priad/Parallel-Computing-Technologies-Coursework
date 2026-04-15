@@ -11,9 +11,8 @@ import (
 )
 
 type acoTuningCase struct {
-	exp        ExperimentConfig
-	instance   vrp.VRPInstance
-	greedyCost float64
+	exp      ExperimentConfig
+	instance vrp.VRPInstance
 }
 
 type acoTuningRow struct {
@@ -22,20 +21,19 @@ type acoTuningRow struct {
 	TotalRuns         int
 	AverageCost       float64
 	AverageDurationMS float64
-	AverageGapPct     float64
 }
 
 const acoTuningWorkers = 6
-const acoConfigEvalEarlyStopMultiplier = 1.2
+const infeasibleRunPenaltyCost = 1e15
 
-func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTuningRow, float64) {
+func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTuningRow) {
 
-	cases, averageGreedyCost := buildACOOnceCases(experiments)
+	cases := buildACOOnceCases(experiments)
 	if len(cases) == 0 {
-		return solver.DefaultACOConfig(), nil, 0
+		return solver.DefaultACOConfig(), nil
 	}
 
-	rows := evaluateACOConfigs(cases, averageGreedyCost, candidateACOConfigs())
+	rows := evaluateACOConfigs(cases, candidateACOConfigs())
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].FeasibleRuns != rows[j].FeasibleRuns {
 			return rows[i].FeasibleRuns > rows[j].FeasibleRuns
@@ -46,25 +44,23 @@ func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTunin
 		return rows[i].AverageDurationMS < rows[j].AverageDurationMS
 	})
 
-	return rows[0].Config, rows, averageGreedyCost
+	return rows[0].Config, rows
 }
 
 func RunACOTuning() {
 	experiments := GetLargeComparisonExperiments()
-	bestConfig, rows, averageGreedyCost := TuneACOConfig(experiments)
+	bestConfig, rows := TuneACOConfig(experiments)
 	fmt.Printf("(sequential ACO, %d workers in config pool)\n", acoTuningWorkers)
-	printTuningResults("ACO (sequential, pooled)", bestConfig, rows, averageGreedyCost)
+	printTuningResults("ACO (sequential, pooled)", bestConfig, rows)
 }
 
-func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTuningRow, averageGreedyCost float64) {
+func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTuningRow) {
 	fmt.Printf("\n=== %s parameter tuning on large instances ===\n", label)
-	fmt.Printf("average greedy cost: %.3f\n", averageGreedyCost)
-	fmt.Printf("%-4s %-48s %12s %12s %14s %14s %12s\n",
+	fmt.Printf("%-4s %-48s %12s %12s %14s %12s\n",
 		"rank",
 		"config",
 		"feasible",
 		"avg_cost",
-		"gap_vs_greedy",
 		"avg_ms",
 		"runs",
 	)
@@ -76,13 +72,12 @@ func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTun
 
 	for i := 0; i < limit; i++ {
 		row := rows[i]
-		fmt.Printf("%-4d %-48s %6d/%-5d %12.3f %12s %14.3f %12d\n",
+		fmt.Printf("%-4d %-48s %6d/%-5d %12.3f %14.3f %12d\n",
 			i+1,
 			formatACOConfig(row.Config),
 			row.FeasibleRuns,
 			row.TotalRuns,
 			row.AverageCost,
-			formatGap(row.AverageGapPct),
 			row.AverageDurationMS,
 			row.TotalRuns,
 		)
@@ -91,9 +86,8 @@ func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTun
 	fmt.Printf("\nselected config: %s\n", formatACOConfig(bestConfig))
 }
 
-func buildACOOnceCases(experiments []ExperimentConfig) ([]acoTuningCase, float64) {
+func buildACOOnceCases(experiments []ExperimentConfig) []acoTuningCase {
 	cases := make([]acoTuningCase, 0, len(experiments))
-	totalGreedyCost := 0.0
 
 	for _, exp := range experiments {
 		_, instance := vrp.GenerateInstance(vrp.GeneratorConfig{
@@ -105,25 +99,16 @@ func buildACOOnceCases(experiments []ExperimentConfig) ([]acoTuningCase, float64
 			CapacityMode: exp.CapacityMode,
 		})
 
-		greedySolution := solver.SolveGreedy(instance, nil)
-		totalGreedyCost += greedySolution.Cost
-
 		cases = append(cases, acoTuningCase{
-			exp:        exp,
-			instance:   instance,
-			greedyCost: greedySolution.Cost,
+			exp:      exp,
+			instance: instance,
 		})
 	}
 
-	averageGreedyCost := 0.0
-	if len(cases) > 0 {
-		averageGreedyCost = totalGreedyCost / float64(len(cases))
-	}
-
-	return cases, averageGreedyCost
+	return cases
 }
 
-func evaluateACOConfigs(cases []acoTuningCase, averageGreedyCost float64, configs []solver.ACOConfig) []acoTuningRow {
+func evaluateACOConfigs(cases []acoTuningCase, configs []solver.ACOConfig) []acoTuningRow {
 	if len(configs) == 0 {
 		return nil
 	}
@@ -145,7 +130,7 @@ func evaluateACOConfigs(cases []acoTuningCase, averageGreedyCost float64, config
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				results <- evaluateSingleACOConfig(cases, averageGreedyCost, job)
+				results <- evaluateSingleACOConfig(cases, job)
 			}
 		}()
 	}
@@ -166,17 +151,10 @@ func evaluateACOConfigs(cases []acoTuningCase, averageGreedyCost float64, config
 	return rows
 }
 
-func evaluateSingleACOConfig(cases []acoTuningCase, averageGreedyCost float64, cfg solver.ACOConfig) acoTuningRow {
+func evaluateSingleACOConfig(cases []acoTuningCase, cfg solver.ACOConfig) acoTuningRow {
 	row := acoTuningRow{Config: cfg}
 	totalCost := 0.0
 	totalDuration := 0.0
-
-	earlyStopCost := 0.0
-	if averageGreedyCost > 0 {
-		earlyStopCost = averageGreedyCost * acoConfigEvalEarlyStopMultiplier
-	}
-
-	stopEarly := false
 	for _, tc := range cases {
 		for trial := 0; trial < 3; trial++ {
 			runCfg := cfg
@@ -188,32 +166,17 @@ func evaluateSingleACOConfig(cases []acoTuningCase, averageGreedyCost float64, c
 				row.FeasibleRuns++
 				totalCost += solution.Cost
 			} else {
-				totalCost += tc.greedyCost * 4.0
+				totalCost += infeasibleRunPenaltyCost
 			}
 
 			totalDuration += solution.DurationMS
 			row.TotalRuns++
-
-			if earlyStopCost > 0 {
-				currentAvg := totalCost / float64(row.TotalRuns)
-				if currentAvg > earlyStopCost {
-					stopEarly = true
-					break
-				}
-			}
-		}
-
-		if stopEarly {
-			break
 		}
 	}
 
 	if row.TotalRuns > 0 {
 		row.AverageCost = totalCost / float64(row.TotalRuns)
 		row.AverageDurationMS = totalDuration / float64(row.TotalRuns)
-	}
-	if averageGreedyCost > 0 {
-		row.AverageGapPct = (row.AverageCost/averageGreedyCost - 1.0) * 100.0
 	}
 
 	return row
@@ -341,14 +304,6 @@ func formatACOConfig(cfg solver.ACOConfig) string {
 		cfg.InitialPheromone,
 		cfg.EliteWeight,
 	)
-}
-
-func formatGap(gapPct float64) string {
-	if math.IsNaN(gapPct) || math.IsInf(gapPct, 0) {
-		return "n/a"
-	}
-
-	return fmt.Sprintf("%+.1f%%", gapPct)
 }
 
 func isFiniteFeasibleCost(cost float64) bool {

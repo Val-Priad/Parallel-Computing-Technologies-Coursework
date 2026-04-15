@@ -8,27 +8,23 @@ import (
 )
 
 type comparisonRow struct {
-	ID               string
-	Customers        int
-	Vehicles         int
-	GreedyCost       float64
-	GreedyDurationMS float64
-	ACOCost          float64
-	ACODurationMS    float64
-	PACOCost         float64
-	PACODurationMS   float64
+	ID             string
+	Customers      int
+	Vehicles       int
+	ACOCost        float64
+	ACODurationMS  float64
+	PACOCost       float64
+	PACODurationMS float64
 }
 
 func RunACOvsPACOComparison() {
 	experiments := GetLargeComparisonExperiments()
 
 	fmt.Println("\n=== ACO vs PACO comparison on large instances ===")
-	fmt.Printf("%-18s %10s %10s %14s %14s %14s %14s %14s %14s %12s %10s\n",
+	fmt.Printf("%-18s %10s %10s %14s %14s %14s %14s %12s %10s\n",
 		"experiment",
 		"customers",
 		"vehicles",
-		"greedy_cost",
-		"greedy_ms",
 		"aco_cost",
 		"aco_ms",
 		"paco_cost",
@@ -42,12 +38,10 @@ func RunACOvsPACOComparison() {
 		deltaCost := row.PACOCost - row.ACOCost
 		speedupText := formatSpeedup(row.ACODurationMS, row.PACODurationMS)
 
-		fmt.Printf("%-18s %10d %10d %14.3f %14.3f %14.3f %14.3f %14.3f %14.3f %12.3f %10s\n",
+		fmt.Printf("%-18s %10d %10d %14.3f %14.3f %14.3f %14.3f %12.3f %10s\n",
 			row.ID,
 			row.Customers,
 			row.Vehicles,
-			row.GreedyCost,
-			row.GreedyDurationMS,
 			row.ACOCost,
 			row.ACODurationMS,
 			row.PACOCost,
@@ -78,7 +72,6 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 	acoCfg.InitialPheromone = 0.50
 	acoCfg.EliteWeight = 3.0
 
-	greedySolution := solver.SolveGreedy(instance, nil)
 	acoSolution := solver.SolveACO(instance, nil, acoCfg)
 
 	pacoCfg := solver.PACOConfig{
@@ -88,15 +81,13 @@ func runComparisonExperiment(exp ExperimentConfig) comparisonRow {
 	pacoSolution := solver.SolvePACO(instance, pacoCfg)
 
 	return comparisonRow{
-		ID:               fmt.Sprintf("c%d_v%d_s%d", exp.NumCustomers, exp.Vehicles, exp.Seed),
-		Customers:        exp.NumCustomers,
-		Vehicles:         exp.Vehicles,
-		GreedyCost:       greedySolution.Cost,
-		ACOCost:          acoSolution.Cost,
-		PACOCost:         pacoSolution.Cost,
-		GreedyDurationMS: greedySolution.DurationMS,
-		ACODurationMS:    acoSolution.DurationMS,
-		PACODurationMS:   pacoSolution.DurationMS,
+		ID:             fmt.Sprintf("c%d_v%d_s%d", exp.NumCustomers, exp.Vehicles, exp.Seed),
+		Customers:      exp.NumCustomers,
+		Vehicles:       exp.Vehicles,
+		ACOCost:        acoSolution.Cost,
+		PACOCost:       pacoSolution.Cost,
+		ACODurationMS:  acoSolution.DurationMS,
+		PACODurationMS: pacoSolution.DurationMS,
 	}
 }
 

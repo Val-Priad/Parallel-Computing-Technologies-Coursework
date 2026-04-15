@@ -30,12 +30,6 @@ func allSolverCases() []solverCase {
 
 	return []solverCase{
 		{
-			name: "greedy",
-			solve: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveGreedy(instance, nil)
-			},
-		},
-		{
 			name: "aco",
 			solve: func(instance vrp.VRPInstance) vrp.Solution {
 				return SolveACO(instance, nil, acoConfig)
