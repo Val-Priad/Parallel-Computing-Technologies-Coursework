@@ -9,35 +9,6 @@ import (
 	"path/filepath"
 )
 
-const (
-	resultsDir = "results"
-)
-
-func saveSolutionLog(runName, algo string, logger *logging.Logger, points []vrp.Point, durationMS float64) {
-	if logger == nil {
-		return
-	}
-
-	logPath := filepath.Join(resultsDir, fmt.Sprintf("%s_%s.json", runName, algo))
-	if err := logger.SaveToFile(logPath, points, durationMS); err != nil {
-		fmt.Printf("Failed to save %s log: %v\n", algo, err)
-	}
-}
-
-func logResult(
-	csvLogger *logging.CSVLogger,
-	runName string,
-	algo string,
-	instance vrp.VRPInstance,
-	solution vrp.Solution,
-	logger *logging.Logger,
-	points []vrp.Point,
-) {
-	fmt.Printf("%s: cost=%.3f, time=%.3fms\n", algo, solution.Cost, solution.DurationMS)
-	saveSolutionLog(runName, algo, logger, points, solution.DurationMS)
-	csvLogger.Log(runName, algo, instance, solution)
-}
-
 func RunBruteForceVsACO() {
 	experiments := GetExperiments()
 
@@ -70,11 +41,11 @@ func RunBruteForceVsACO() {
 
 		acoLogger := logging.NewLogger(true)
 		acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
-		logResult(csvLogger, runName, "aco", instance, acoSolution, acoLogger, points)
+		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, acoLogger, points)
 
 		bruteForceLogger := logging.NewLogger(true)
 		exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
-		logResult(csvLogger, runName, "brute_force", instance, exactSolution, bruteForceLogger, points)
+		writeExperimentResult(csvLogger, runName, "brute_force", instance, exactSolution, bruteForceLogger, points)
 	}
 
 }
