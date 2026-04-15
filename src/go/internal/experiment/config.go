@@ -55,9 +55,9 @@ func GetExperiments() []ExperimentConfig {
 	)
 }
 
-func GetLargeComparisonExperiments() []ExperimentConfig {
+func GetLargeComparisonExperiments(qty int) []ExperimentConfig {
 	return generateExperiments(
-		10,
+		qty,
 		50,
 		10,
 		func(i int) int { return 8 + i },

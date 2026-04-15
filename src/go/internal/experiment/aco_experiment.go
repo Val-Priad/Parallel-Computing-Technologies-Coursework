@@ -10,7 +10,7 @@ import (
 )
 
 func RunACOExperiment() {
-	experiments := GetLargeComparisonExperiments()
+	experiments := GetLargeComparisonExperiments(10)
 
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		panic(err)
@@ -39,9 +39,8 @@ func RunACOExperiment() {
 			CapacityMode: exp.CapacityMode,
 		})
 
-		acoLogger := logging.NewLogger(false)
-		acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
-		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, acoLogger, points)
+		acoSolution := solver.SolveACO(instance, nil, solver.DefaultACOConfig())
+		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, nil, points)
 	}
 
 	fmt.Println("\nDone.")

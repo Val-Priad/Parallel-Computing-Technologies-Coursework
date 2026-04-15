@@ -48,7 +48,7 @@ func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTunin
 }
 
 func RunACOTuning() {
-	experiments := GetLargeComparisonExperiments()
+	experiments := GetLargeComparisonExperiments(5)
 	bestConfig, rows := TuneACOConfig(experiments)
 	fmt.Printf("(sequential ACO, %d workers in config pool)\n", acoTuningWorkers)
 	printTuningResults("ACO (sequential, pooled)", bestConfig, rows)
