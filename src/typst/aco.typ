@@ -4,8 +4,6 @@
 
 #counter(figure.where(kind: "algorithm")).update(0)
 
-#pagebreak()
-
 #algorithm-figure(
   supplement: "ACO",
   "Ant Colony Optimization",
