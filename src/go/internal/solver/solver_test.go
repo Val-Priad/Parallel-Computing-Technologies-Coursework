@@ -2,263 +2,326 @@ package solver
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
 	"parallel-aco/internal/logging"
 	"parallel-aco/internal/vrp"
 )
 
-func TestSolversOnSimpleInstance(t *testing.T) {
-	instance := simpleInstance()
-	expectedCost := 3.0
+const costEpsilon = 1e-9
 
-	tests := []struct {
-		name   string
-		solver func(vrp.VRPInstance) vrp.Solution
-	}{
-		{
-			name: "brute force",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveBruteForce(instance, logging.NewLogger(false))
-			},
-		},
+type solverCase struct {
+	name  string
+	solve func(vrp.VRPInstance) vrp.Solution
+}
+
+type instanceCase struct {
+	name  string
+	build func() vrp.VRPInstance
+}
+
+func allSolverCases() []solverCase {
+	acoConfig := ACOConfig{
+		NumAnts:    20,
+		Iterations: 20,
+		Seed:       42,
+	}
+
+	return []solverCase{
 		{
 			name: "greedy",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
+			solve: func(instance vrp.VRPInstance) vrp.Solution {
 				return SolveGreedy(instance, nil)
 			},
 		},
 		{
 			name: "aco",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveACO(instance, nil, ACOConfig{
-					NumAnts:    20,
-					Iterations: 20,
-					Seed:       42,
-				})
+			solve: func(instance vrp.VRPInstance) vrp.Solution {
+				return SolveACO(instance, nil, acoConfig)
 			},
 		},
 		{
 			name: "paco",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
+			solve: func(instance vrp.VRPInstance) vrp.Solution {
 				return SolvePACO(instance, PACOConfig{
-					BaseConfig: ACOConfig{
-						NumAnts:    20,
-						Iterations: 20,
-						Seed:       42,
-					},
+					BaseConfig: acoConfig,
 					NumWorkers: 2,
 				})
 			},
 		},
 	}
+}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			solution := tc.solver(instance)
-			assertFeasibleSolution(t, instance, solution)
+func TestSolvers_SmallInstances_CompareAgainstBruteForceOracle(t *testing.T) {
+	instances := []instanceCase{
+		{name: "empty", build: emptyInstance},
+		{
+			name: "small tight capacity",
+			build: generatedInstance(vrp.GeneratorConfig{
+				NumCustomers: 3,
+				Vehicles:     1,
+				Width:        20,
+				Height:       20,
+				Seed:         101,
+				MinDemand:    1,
+				MaxDemand:    3,
+				CapacityMode: vrp.CapacityTight,
+			}),
+		},
+		{
+			name: "small two vehicles",
+			build: generatedInstance(vrp.GeneratorConfig{
+				NumCustomers: 4,
+				Vehicles:     2,
+				Width:        25,
+				Height:       25,
+				Seed:         102,
+				MinDemand:    1,
+				MaxDemand:    4,
+				CapacityMode: vrp.CapacityAuto,
+			}),
+		},
+		{
+			name: "small fixed capacity",
+			build: generatedInstance(vrp.GeneratorConfig{
+				NumCustomers:  5,
+				Vehicles:      2,
+				Width:         30,
+				Height:        30,
+				Seed:          103,
+				MinDemand:     1,
+				MaxDemand:     3,
+				CapacityMode:  vrp.CapacityFixed,
+				FixedCapacity: 5,
+			}),
+		},
+	}
 
-			if diff := math.Abs(solution.Cost - expectedCost); diff > 1e-9 {
-				t.Fatalf("unexpected cost: got %.12f, want %.12f", solution.Cost, expectedCost)
-			}
+	for _, ic := range instances {
+		t.Run(ic.name, func(t *testing.T) {
+			instance := ic.build()
+			oracle := solveBruteForceOracle(t, instance)
+			results := runAllSolvers(t, instance)
 
-			if diff := math.Abs(solutionCost(instance, solution) - solution.Cost); diff > 1e-9 {
-				t.Fatalf("solution cost does not match route cost: got %.12f, computed %.12f", solution.Cost, solutionCost(instance, solution))
-			}
+			assertAllSolutionsValid(t, instance, results)
+			assertNoSolverBeatsOracle(t, oracle.Cost, results)
 		})
 	}
 }
 
-func TestSolversOnEmptyInstance(t *testing.T) {
-	instance := vrp.VRPInstance{}
-
-	tests := []struct {
-		name   string
-		solver func(vrp.VRPInstance) vrp.Solution
-	}{
+func TestSolvers_ComplexInstances_FeasibilityAndBruteForceBaseline(t *testing.T) {
+	instances := []instanceCase{
 		{
-			name: "brute force",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveBruteForce(instance, logging.NewLogger(false))
-			},
+			name: "complex mixed auto capacity",
+			build: generatedInstance(vrp.GeneratorConfig{
+				NumCustomers:  6,
+				Vehicles:      2,
+				Width:         60,
+				Height:        40,
+				Seed:          201,
+				MinDemand:     1,
+				MaxDemand:     5,
+				CapacityMode:  vrp.CapacityAuto,
+				CapacitySlack: 1.10,
+			}),
 		},
 		{
-			name: "greedy",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveGreedy(instance, nil)
-			},
-		},
-		{
-			name: "aco",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolveACO(instance, nil, DefaultACOConfig())
-			},
-		},
-		{
-			name: "paco",
-			solver: func(instance vrp.VRPInstance) vrp.Solution {
-				return SolvePACO(instance, PACOConfig{BaseConfig: DefaultACOConfig()})
-			},
+			name: "complex tight three vehicles",
+			build: generatedInstance(vrp.GeneratorConfig{
+				NumCustomers: 7,
+				Vehicles:     3,
+				Width:        70,
+				Height:       50,
+				Seed:         202,
+				MinDemand:    1,
+				MaxDemand:    4,
+				CapacityMode: vrp.CapacityTight,
+			}),
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			solution := tc.solver(instance)
-			assertFeasibleSolution(t, instance, solution)
+	for _, ic := range instances {
+		t.Run(ic.name, func(t *testing.T) {
+			instance := ic.build()
+			oracle := solveBruteForceOracle(t, instance)
+			results := runAllSolvers(t, instance)
 
-			if solution.Cost != 0 {
-				t.Fatalf("unexpected cost: got %.12f, want 0", solution.Cost)
-			}
+			assertAllSolutionsValid(t, instance, results)
+			assertNoSolverBeatsOracle(t, oracle.Cost, results)
 		})
 	}
 }
 
-// func TestSolversOnHardInstance(t *testing.T) {
-// 	instance := hardInstance()
+func TestSolvers_Determinism_ACO(t *testing.T) {
+	instance := generatedInstance(vrp.GeneratorConfig{
+		NumCustomers: 5,
+		Vehicles:     2,
+		Width:        30,
+		Height:       30,
+		Seed:         301,
+		MinDemand:    1,
+		MaxDemand:    4,
+		CapacityMode: vrp.CapacityAuto,
+	})()
 
-// 	results := []struct {
-// 		name     string
-// 		solution vrp.Solution
-// 	}{
-// 		{
-// 			name:     "brute force",
-// 			solution: SolveBruteForce(instance, logging.NewLogger(false)),
-// 		},
-// 		{
-// 			name:     "greedy",
-// 			solution: SolveGreedy(instance, nil),
-// 		},
-// 		{
-// 			name: "aco",
-// 			solution: SolveACO(instance, nil, ACOConfig{
-// 				NumAnts:    20,
-// 				Iterations: 20,
-// 				Seed:       42,
-// 			}),
-// 		},
-// 		{
-// 			name: "paco",
-// 			solution: SolvePACO(instance, PACOConfig{
-// 				BaseConfig: ACOConfig{
-// 					NumAnts:    20,
-// 					Iterations: 20,
-// 					Seed:       42,
-// 				},
-// 				NumWorkers: 2,
-// 			}),
-// 		},
-// 	}
+	cfg := ACOConfig{
+		NumAnts:    12,
+		Iterations: 12,
+		Seed:       4242,
+	}
 
-// 	for _, result := range results {
-// 		t.Run(result.name, func(t *testing.T) {
-// 			assertFeasibleSolution(t, instance, result.solution)
+	first := SolveACO(instance, nil, cfg)
+	second := SolveACO(instance, nil, cfg)
 
-// 			if diff := math.Abs(solutionCost(instance, result.solution) - result.solution.Cost); diff > 1e-9 {
-// 				t.Fatalf("solution cost does not match route cost: got %.12f, computed %.12f", result.solution.Cost, solutionCost(instance, result.solution))
-// 			}
-// 		})
-// 	}
+	assertValidSolution(t, instance, first)
+	assertValidSolution(t, instance, second)
 
-// 	bruteForceCost := results[0].solution.Cost
-// 	greedyCost := results[1].solution.Cost
-// 	acoCost := results[2].solution.Cost
-// 	pacoCost := results[3].solution.Cost
-
-// 	if bruteForceCost > greedyCost {
-// 		t.Fatalf("expected brute force to be no worse than greedy: brute force %.12f, greedy %.12f", bruteForceCost, greedyCost)
-// 	}
-
-// 	if acoCost < bruteForceCost || acoCost > greedyCost {
-// 		t.Fatalf("expected ACO cost to be between brute force and greedy: brute force %.12f, aco %.12f, greedy %.12f", bruteForceCost, acoCost, greedyCost)
-// 	}
-
-// 	if pacoCost < bruteForceCost || pacoCost > greedyCost {
-// 		t.Fatalf("expected PACO cost to be between brute force and greedy: brute force %.12f, paco %.12f, greedy %.12f", bruteForceCost, pacoCost, greedyCost)
-// 	}
-// }
-
-func simpleInstance() vrp.VRPInstance {
-	return vrp.VRPInstance{
-		Vehicles:        1,
-		VehicleCapacity: 10,
-		Customers: []vrp.Point{
-			{ID: 1, X: 1, Y: 0, Demand: 1},
-			{ID: 2, X: 0, Y: 1, Demand: 1},
-		},
-		Dist: [][]float64{
-			{0, 1, 1},
-			{1, 0, 1},
-			{1, 1, 0},
-		},
+	if diff := math.Abs(first.Cost - second.Cost); diff > costEpsilon {
+		t.Fatalf("ACO should be deterministic for the same seed: cost mismatch %.12f vs %.12f", first.Cost, second.Cost)
+	}
+	if !reflect.DeepEqual(first.Routes, second.Routes) {
+		t.Fatalf("ACO should be deterministic for the same seed: routes differ: %+v vs %+v", first.Routes, second.Routes)
 	}
 }
 
-func hardInstance() vrp.VRPInstance {
-	_, instance := vrp.GenerateInstance(vrp.GeneratorConfig{
-		NumCustomers: 8,
-		Vehicles:     3,
-		Width:        100,
-		Height:       100,
-		Seed:         42,
-	})
-	return instance
+func generatedInstance(cfg vrp.GeneratorConfig) func() vrp.VRPInstance {
+	return func() vrp.VRPInstance {
+		_, instance := vrp.GenerateInstance(cfg)
+		return instance
+	}
 }
 
-func assertFeasibleSolution(t *testing.T, instance vrp.VRPInstance, solution vrp.Solution) {
+func solveBruteForceOracle(t *testing.T, instance vrp.VRPInstance) vrp.Solution {
+	t.Helper()
+	oracle := SolveBruteForce(instance, logging.NewLogger(false))
+	assertValidSolution(t, instance, oracle)
+
+	computed := solutionCost(instance, oracle)
+	if diff := math.Abs(oracle.Cost - computed); diff > costEpsilon {
+		t.Fatalf("oracle cost mismatch: got %.12f, computed %.12f", oracle.Cost, computed)
+	}
+
+	return oracle
+}
+
+func runAllSolvers(t *testing.T, instance vrp.VRPInstance) []struct {
+	name     string
+	solution vrp.Solution
+} {
 	t.Helper()
 
-	if !isSolutionFeasible(instance, solution) {
-		t.Fatalf("solution is not feasible: %+v", solution)
+	solvers := allSolverCases()
+	results := make([]struct {
+		name     string
+		solution vrp.Solution
+	}, 0, len(solvers))
+
+	for _, solver := range solvers {
+		results = append(results, struct {
+			name     string
+			solution vrp.Solution
+		}{
+			name:     solver.name,
+			solution: solver.solve(instance),
+		})
+	}
+
+	return results
+}
+
+func assertAllSolutionsValid(t *testing.T, instance vrp.VRPInstance, results []struct {
+	name     string
+	solution vrp.Solution
+}) {
+	t.Helper()
+
+	for _, result := range results {
+		t.Run(result.name, func(t *testing.T) {
+			assertValidSolution(t, instance, result.solution)
+		})
 	}
 }
 
-func isSolutionFeasible(instance vrp.VRPInstance, solution vrp.Solution) bool {
+func assertNoSolverBeatsOracle(t *testing.T, oracleCost float64, results []struct {
+	name     string
+	solution vrp.Solution
+}) {
+	t.Helper()
+
+	if len(results) == 0 {
+		t.Fatalf("no solver results")
+	}
+
+	for _, result := range results {
+		if result.solution.Cost+costEpsilon < oracleCost {
+			t.Fatalf("solver %q produced cost below oracle optimum: got %.12f, oracle %.12f", result.name, result.solution.Cost, oracleCost)
+		}
+	}
+}
+
+func assertValidSolution(t *testing.T, instance vrp.VRPInstance, solution vrp.Solution) {
+	t.Helper()
+
+	if math.IsNaN(solution.Cost) || math.IsInf(solution.Cost, 0) {
+		t.Fatalf("solution cost must be finite, got %.12f", solution.Cost)
+	}
+	if solution.Cost < -costEpsilon {
+		t.Fatalf("solution cost must be non-negative, got %.12f", solution.Cost)
+	}
+	if len(solution.Routes) > instance.Vehicles {
+		t.Fatalf("too many routes: got %d, vehicles %d", len(solution.Routes), instance.Vehicles)
+	}
+
+	computedCost := solutionCost(instance, solution)
+	if diff := math.Abs(solution.Cost - computedCost); diff > costEpsilon {
+		t.Fatalf("solution cost mismatch: got %.12f, computed %.12f", solution.Cost, computedCost)
+	}
+
+	if !isFeasibleCoverageAndCapacity(instance, solution) {
+		t.Fatalf("solution is infeasible: %+v", solution)
+	}
+}
+
+func isFeasibleCoverageAndCapacity(instance vrp.VRPInstance, solution vrp.Solution) bool {
 	if len(instance.Customers) == 0 {
 		return len(solution.Routes) == 0
 	}
 
 	seen := make(map[int]bool, len(instance.Customers))
 	demandByID := make(map[int]int, len(instance.Customers))
-	totalDemand := 0
 
 	for _, customer := range instance.Customers {
-		if customer.ID < 0 {
+		if customer.ID <= 0 {
 			return false
 		}
 		if _, exists := seen[customer.ID]; exists {
 			return false
 		}
-
 		seen[customer.ID] = false
 		demandByID[customer.ID] = customer.Demand
-		totalDemand += customer.Demand
 	}
 
-	servedDemand := 0
 	for _, route := range solution.Routes {
 		load := 0
+		if len(route.Nodes) == 0 {
+			continue
+		}
 		for _, node := range route.Nodes {
-			if _, exists := seen[node]; !exists || seen[node] {
+			served, exists := seen[node]
+			if !exists || served {
 				return false
 			}
-
 			seen[node] = true
 			load += demandByID[node]
-			servedDemand += demandByID[node]
 		}
-
 		if load > instance.VehicleCapacity {
 			return false
 		}
 	}
 
-	if servedDemand != totalDemand {
-		return false
-	}
-
-	for _, wasSeen := range seen {
-		if !wasSeen {
+	for _, served := range seen {
+		if !served {
 			return false
 		}
 	}
@@ -272,4 +335,8 @@ func solutionCost(instance vrp.VRPInstance, solution vrp.Solution) float64 {
 		total += computeRouteCost(route.Nodes, instance.Dist)
 	}
 	return total
+}
+
+func emptyInstance() vrp.VRPInstance {
+	return vrp.VRPInstance{}
 }
