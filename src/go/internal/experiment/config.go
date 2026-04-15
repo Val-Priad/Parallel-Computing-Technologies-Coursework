@@ -66,3 +66,15 @@ func GetLargeComparisonExperiments() []ExperimentConfig {
 		5,
 	)
 }
+
+func GetACOvsPACOExperiments() []ExperimentConfig {
+	return generateExperiments(
+		7,
+		50,
+		10,
+		func(i int) int { return 8 + i },
+		func(i int) float64 { return float64(180 + i*20) },
+		vrp.CapacityAuto,
+		25,
+	)
+}

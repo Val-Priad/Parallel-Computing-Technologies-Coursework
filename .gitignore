@@ -217,7 +217,7 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,python
 
-logs
 *.csv
 *.pdf
 *.png
+**/results
