@@ -9,24 +9,24 @@ import (
 	"path/filepath"
 )
 
-func RunACOvsPACO() {
+func RunACOExperiment() {
 	experiments := GetLargeComparisonExperiments()
 
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		panic(err)
 	}
 
-	csvLogger, err := logging.NewCSVLogger(filepath.Join(resultsDir, "aco_vs_paco.csv"))
+	csvLogger, err := logging.NewCSVLogger(filepath.Join(resultsDir, "aco.csv"))
 	if err != nil {
 		panic(err)
 	}
 	defer csvLogger.Close()
 
-	fmt.Println("Running ACO vs PACO comparison")
+	fmt.Println("Running ACO experiment")
 
 	for expIdx, exp := range experiments {
 		runSeed := exp.Seed
-		runName := fmt.Sprintf("paco_exp_%d_c%d_v%d_w%.0f_h%.0f", expIdx+1, exp.NumCustomers, exp.Vehicles, exp.Width, exp.Height)
+		runName := fmt.Sprintf("aco_exp_%d_c%d_v%d_w%.0f_h%.0f", expIdx+1, exp.NumCustomers, exp.Vehicles, exp.Width, exp.Height)
 
 		fmt.Println("\n=== Running", runName, "(seed", runSeed, ")===")
 
@@ -39,13 +39,9 @@ func RunACOvsPACO() {
 			CapacityMode: exp.CapacityMode,
 		})
 
-		acoLogger := logging.NewLogger(true)
+		acoLogger := logging.NewLogger(false)
 		acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
-
-		pacoSolution := solver.SolvePACO(instance, solver.PACOConfig{BaseConfig: solver.DefaultACOConfig()})
-
 		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, acoLogger, points)
-		writeExperimentResult(csvLogger, runName, "paco", instance, pacoSolution, nil, points)
 	}
 
 	fmt.Println("\nDone.")
