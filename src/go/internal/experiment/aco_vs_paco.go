@@ -11,7 +11,13 @@ import (
 
 func RunACOvsPACO() {
 	experiments := GetLargeComparisonExperiments(5)
-	const runsPerExperiment = 3
+	const runsPerExperiment = 20
+	const warmupRuns = 3
+
+	if len(experiments) == 0 {
+		fmt.Println("No experiments configured.")
+		return
+	}
 
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		panic(err)
@@ -24,6 +30,18 @@ func RunACOvsPACO() {
 	defer csvLogger.Close()
 
 	fmt.Println("Running ACO vs PACO comparison")
+
+	firstExp := experiments[0]
+	_, firstInstance := vrp.GenerateInstance(vrp.GeneratorConfig{
+		NumCustomers: firstExp.NumCustomers,
+		Vehicles:     firstExp.Vehicles,
+		Width:        firstExp.Width,
+		Height:       firstExp.Height,
+		Seed:         firstExp.Seed,
+		CapacityMode: firstExp.CapacityMode,
+	})
+
+	warmupACOAndPACO(firstInstance, firstExp.Seed, warmupRuns)
 
 	for expIdx, exp := range experiments {
 		runSeed := exp.Seed
@@ -75,4 +93,18 @@ func RunACOvsPACO() {
 	}
 
 	fmt.Println("\nDone.")
+}
+
+func warmupACOAndPACO(instance vrp.VRPInstance, seed int64, warmupRuns int) {
+	for warmup := 0; warmup < warmupRuns; warmup++ {
+		currentSeed := seed + int64(warmup)
+
+		acoCfg := solver.DefaultACOConfig()
+		acoCfg.Seed = currentSeed
+		_ = solver.SolveACO(instance, nil, acoCfg)
+
+		pacoCfg := solver.PACOConfig{BaseConfig: solver.DefaultACOConfig(), NumWorkers: 11}
+		pacoCfg.BaseConfig.Seed = currentSeed
+		_ = solver.SolvePACO(instance, pacoCfg)
+	}
 }
