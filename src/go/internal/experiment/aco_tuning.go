@@ -2,7 +2,6 @@ package experiment
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 
@@ -17,14 +16,14 @@ type acoTuningCase struct {
 
 type acoTuningRow struct {
 	Config            solver.ACOConfig
-	FeasibleRuns      int
 	TotalRuns         int
 	AverageCost       float64
 	AverageDurationMS float64
 }
 
-const acoTuningWorkers = 6
-const infeasibleRunPenaltyCost = 1e15
+const acoTuningWorkers = 11
+const trialQty = 5
+const comparisonExperimentsQty = 5
 
 func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTuningRow) {
 
@@ -35,9 +34,6 @@ func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTunin
 
 	rows := evaluateACOConfigs(cases, candidateACOConfigs())
 	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].FeasibleRuns != rows[j].FeasibleRuns {
-			return rows[i].FeasibleRuns > rows[j].FeasibleRuns
-		}
 		if rows[i].AverageCost != rows[j].AverageCost {
 			return rows[i].AverageCost < rows[j].AverageCost
 		}
@@ -48,7 +44,7 @@ func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTunin
 }
 
 func RunACOTuning() {
-	experiments := GetLargeComparisonExperiments(5)
+	experiments := GetLargeComparisonExperiments(comparisonExperimentsQty)
 	bestConfig, rows := TuneACOConfig(experiments)
 	fmt.Printf("(sequential ACO, %d workers in config pool)\n", acoTuningWorkers)
 	printTuningResults("ACO (sequential, pooled)", bestConfig, rows)
@@ -56,27 +52,19 @@ func RunACOTuning() {
 
 func printTuningResults(label string, bestConfig solver.ACOConfig, rows []acoTuningRow) {
 	fmt.Printf("\n=== %s parameter tuning on large instances ===\n", label)
-	fmt.Printf("%-4s %-48s %12s %12s %14s %12s\n",
+	fmt.Printf("%-4s %-60s %12s %14s %12s\n",
 		"rank",
 		"config",
-		"feasible",
 		"avg_cost",
 		"avg_ms",
 		"runs",
 	)
 
-	limit := 5
-	if len(rows) < limit {
-		limit = len(rows)
-	}
-
-	for i := 0; i < limit; i++ {
+	for i := 0; i < len(rows); i++ {
 		row := rows[i]
-		fmt.Printf("%-4d %-48s %6d/%-5d %12.3f %14.3f %12d\n",
+		fmt.Printf("%-4d %-60s %12.3f %14.3f %12d\n",
 			i+1,
 			formatACOConfig(row.Config),
-			row.FeasibleRuns,
-			row.TotalRuns,
 			row.AverageCost,
 			row.AverageDurationMS,
 			row.TotalRuns,
@@ -156,18 +144,12 @@ func evaluateSingleACOConfig(cases []acoTuningCase, cfg solver.ACOConfig) acoTun
 	totalCost := 0.0
 	totalDuration := 0.0
 	for _, tc := range cases {
-		for trial := 0; trial < 3; trial++ {
+		for trial := 0; trial < trialQty; trial++ {
 			runCfg := cfg
 			runCfg.Seed = tc.exp.Seed + int64(trial)
 
 			solution := solver.SolveACO(tc.instance, nil, runCfg)
-
-			if isFiniteFeasibleCost(solution.Cost) {
-				row.FeasibleRuns++
-				totalCost += solution.Cost
-			} else {
-				totalCost += infeasibleRunPenaltyCost
-			}
+			totalCost += solution.Cost
 
 			totalDuration += solution.DurationMS
 			row.TotalRuns++
@@ -304,8 +286,4 @@ func formatACOConfig(cfg solver.ACOConfig) string {
 		cfg.InitialPheromone,
 		cfg.EliteWeight,
 	)
-}
-
-func isFiniteFeasibleCost(cost float64) bool {
-	return !math.IsInf(cost, 0) && !math.IsNaN(cost) && cost > 0
 }
