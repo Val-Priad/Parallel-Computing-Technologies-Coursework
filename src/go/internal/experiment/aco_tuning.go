@@ -22,8 +22,7 @@ type acoTuningRow struct {
 }
 
 const acoTuningWorkers = 11
-const trialQty = 5
-const comparisonExperimentsQty = 5
+const acoTunningRunsPerExperiment = 5
 
 func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTuningRow) {
 
@@ -44,7 +43,7 @@ func TuneACOConfig(experiments []ExperimentConfig) (solver.ACOConfig, []acoTunin
 }
 
 func RunACOTuning() {
-	experiments := GetLargeComparisonExperiments(comparisonExperimentsQty)
+	experiments := GetLargeComparisonExperiments(5)
 	bestConfig, rows := TuneACOConfig(experiments)
 	fmt.Printf("(sequential ACO, %d workers in config pool)\n", acoTuningWorkers)
 	printTuningResults("ACO (sequential, pooled)", bestConfig, rows)
@@ -144,7 +143,7 @@ func evaluateSingleACOConfig(cases []acoTuningCase, cfg solver.ACOConfig) acoTun
 	totalCost := 0.0
 	totalDuration := 0.0
 	for _, tc := range cases {
-		for trial := 0; trial < trialQty; trial++ {
+		for trial := 0; trial < acoTunningRunsPerExperiment; trial++ {
 			runCfg := cfg
 			runCfg.Seed = tc.exp.Seed + int64(trial)
 
