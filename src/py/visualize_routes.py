@@ -4,7 +4,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-LOGS_DIR = Path(__file__).resolve().parent.parent / "go" / "results"
+LOGS_DIR = (
+    Path(__file__).resolve().parent.parent / "go" / "results" / "brute_vs_aco"
+)
 SOLUTIONS_DIR = Path(__file__).resolve().parent / "solutions"
 
 

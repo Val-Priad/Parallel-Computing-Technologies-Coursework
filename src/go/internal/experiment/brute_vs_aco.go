@@ -41,11 +41,11 @@ func RunBruteForceVsACO() {
 
 		acoLogger := logging.NewLogger(true)
 		acoSolution := solver.SolveACO(instance, acoLogger, solver.DefaultACOConfig())
-		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, acoLogger, points)
+		writeExperimentResult(csvLogger, runName, "aco", "brute_vs_aco", instance, acoSolution, acoLogger, points)
 
 		bruteForceLogger := logging.NewLogger(true)
 		exactSolution := solver.SolveBruteForce(instance, bruteForceLogger)
-		writeExperimentResult(csvLogger, runName, "brute_force", instance, exactSolution, bruteForceLogger, points)
+		writeExperimentResult(csvLogger, runName, "brute_force", "brute_vs_aco", instance, exactSolution, bruteForceLogger, points)
 	}
 
 }

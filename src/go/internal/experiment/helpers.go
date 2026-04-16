@@ -13,6 +13,7 @@ func writeExperimentResult(
 	csvLogger *logging.CSVLogger,
 	runName string,
 	algo string,
+	logSubdir string,
 	instance vrp.VRPInstance,
 	solution vrp.Solution,
 	logger *logging.Logger,
@@ -21,7 +22,12 @@ func writeExperimentResult(
 	fmt.Printf("%s: cost=%.3f, time=%.3fms\n", algo, solution.Cost, solution.DurationMS)
 
 	if logger != nil {
-		logPath := filepath.Join(resultsDir, fmt.Sprintf("%s_%s.json", runName, algo))
+		logDir := resultsDir
+		if logSubdir != "" {
+			logDir = filepath.Join(resultsDir, logSubdir)
+		}
+
+		logPath := filepath.Join(logDir, fmt.Sprintf("%s_%s.json", runName, algo))
 		if err := logger.SaveToFile(logPath, points, solution.DurationMS); err != nil {
 			fmt.Printf("Failed to save %s log: %v\n", algo, err)
 		}

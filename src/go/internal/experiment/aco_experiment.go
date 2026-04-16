@@ -40,7 +40,7 @@ func RunACOExperiment() {
 		})
 
 		acoSolution := solver.SolveACO(instance, nil, solver.DefaultACOConfig())
-		writeExperimentResult(csvLogger, runName, "aco", instance, acoSolution, nil, points)
+		writeExperimentResult(csvLogger, runName, "aco", "aco", instance, acoSolution, nil, points)
 	}
 
 	fmt.Println("\nDone.")

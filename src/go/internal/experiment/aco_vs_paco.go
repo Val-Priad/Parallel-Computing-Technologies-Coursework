@@ -70,8 +70,8 @@ func RunACOvsPACO() {
 			DurationMS: pacoTotalDuration / float64(runsPerExperiment),
 		}
 
-		writeExperimentResult(csvLogger, runName, "aco", instance, avgAcoSolution, nil, points)
-		writeExperimentResult(csvLogger, runName, "paco", instance, avgPacoSolution, nil, points)
+		writeExperimentResult(csvLogger, runName, "aco", "aco_vs_paco", instance, avgAcoSolution, nil, points)
+		writeExperimentResult(csvLogger, runName, "paco", "aco_vs_paco", instance, avgPacoSolution, nil, points)
 	}
 
 	fmt.Println("\nDone.")
