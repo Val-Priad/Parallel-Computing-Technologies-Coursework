@@ -7,7 +7,7 @@ CSV_PATH = (
     Path(__file__).resolve().parent.parent / "go" / "results" / "aco.csv"
 )
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "solutions" / "aco"
+OUTPUT_DIR = Path(__file__).resolve().parent / "results" / "aco"
 
 
 def read_results():

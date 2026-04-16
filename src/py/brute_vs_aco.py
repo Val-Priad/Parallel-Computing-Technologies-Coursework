@@ -10,7 +10,7 @@ CSV_PATH = (
     / "brute_force_vs_aco.csv"
 )
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "solutions" / "brute_vs_aco"
+OUTPUT_DIR = Path(__file__).resolve().parent / "results" / "brute_vs_aco"
 
 
 def read_results():
