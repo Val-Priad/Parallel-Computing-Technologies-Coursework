@@ -51,7 +51,7 @@ def plot_step(ax, step, points, colors):
     plot_points(ax, points)
     plot_routes(ax, step["routes"], points, colors)
 
-    ax.set_title(f"Step {step['step_id']} | Cost: {step['cost']:.2f}")
+    ax.set_title(f"Step {step['step_id'] + 1} | Cost: {step['cost']:.2f}")
     ax.set_aspect("equal")
     ax.grid(True)
 
