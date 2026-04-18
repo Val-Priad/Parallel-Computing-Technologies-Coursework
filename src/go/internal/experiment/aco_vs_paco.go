@@ -103,7 +103,7 @@ func warmupACOAndPACO(instance vrp.VRPInstance, seed int64, warmupRuns int) {
 		acoCfg.Seed = currentSeed
 		_ = solver.SolveACO(instance, nil, acoCfg)
 
-		pacoCfg := solver.PACOConfig{BaseConfig: solver.DefaultACOConfig(), NumWorkers: 11}
+		pacoCfg := solver.PACOConfig{BaseConfig: solver.DefaultACOConfig()}
 		pacoCfg.BaseConfig.Seed = currentSeed
 		_ = solver.SolvePACO(instance, pacoCfg)
 	}
