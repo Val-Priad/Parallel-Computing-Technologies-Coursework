@@ -141,9 +141,8 @@
         Assign[`dist`][Matrix(n, n, 0)]
 
         For([`i = 0` to `n-1`], {
-          For([`j = i` to `n-1`], {
+          For([`j = 0` to `n-1`], {
             Assign[`dist[i][j]`][Distance(points[i], points[j])]
-            Assign[`dist[j][i]`][`dist[i][j]`]
           })
         })
 
