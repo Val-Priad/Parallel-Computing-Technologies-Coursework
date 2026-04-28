@@ -10,8 +10,9 @@ import (
 )
 
 type PACOConfig struct {
-	BaseConfig ACOConfig
-	NumWorkers int
+	BaseConfig   ACOConfig
+	NumWorkers   int
+	NumExchanges int
 }
 
 func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
@@ -31,6 +32,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	}
 
 	cfg.NumWorkers = resolvePACOWorkers(cfg.NumWorkers, cfg.BaseConfig.NumAnts)
+	cfg.NumExchanges = resolveExchangesQty(cfg.NumExchanges)
 
 	type result struct {
 		best vrp.Solution
@@ -40,6 +42,17 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	antsPerWorker := splitAnts(cfg.BaseConfig.NumAnts, cfg.NumWorkers)
 
 	var wg sync.WaitGroup
+
+	var globalBest vrp.Solution = vrp.Solution{
+		Routes: []vrp.Route{},
+		Cost:   math.Inf(1),
+	}
+	var mu sync.Mutex
+
+	exchangeInterval := cfg.BaseConfig.Iterations / cfg.NumExchanges
+	if exchangeInterval <= 0 {
+		exchangeInterval = 1
+	}
 
 	for w := 0; w < cfg.NumWorkers; w++ {
 		wg.Add(1)
@@ -77,6 +90,19 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 					}
 				}
 
+				doExchange := (iter+1)%exchangeInterval == 0
+
+				var sharedBest vrp.Solution
+
+				if doExchange {
+					mu.Lock()
+					if best.Cost < globalBest.Cost {
+						globalBest = cloneSolution(best)
+					}
+					sharedBest = cloneSolution(globalBest)
+					mu.Unlock()
+				}
+
 				evaporate(pheromone, localCfg.Evaporation)
 
 				for _, ant := range ants {
@@ -89,6 +115,10 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 				if !math.IsInf(best.Cost, 1) && best.Cost > 0 {
 					depositSolution(pheromone, best, localCfg.EliteWeight*localCfg.Q/best.Cost)
 				}
+
+				if doExchange && !math.IsInf(sharedBest.Cost, 1) && sharedBest.Cost > 0 && sharedBest.Cost < best.Cost {
+					depositSolution(pheromone, sharedBest, localCfg.EliteWeight*localCfg.Q/sharedBest.Cost)
+				}
 			}
 
 			results[workerID] = result{best: best}
@@ -96,17 +126,6 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	}
 
 	wg.Wait()
-
-	globalBest := vrp.Solution{
-		Routes: []vrp.Route{},
-		Cost:   math.Inf(1),
-	}
-
-	for _, r := range results {
-		if r.best.Cost < globalBest.Cost {
-			globalBest = cloneSolution(r.best)
-		}
-	}
 
 	if math.IsInf(globalBest.Cost, 1) {
 		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
@@ -127,6 +146,13 @@ func resolvePACOWorkers(numWorkers, numAnts int) int {
 	}
 
 	return numWorkers
+}
+
+func resolveExchangesQty(exchangesQty int) int {
+	if exchangesQty <= 0 {
+		return 10
+	}
+	return exchangesQty
 }
 
 func splitAnts(total, workers int) []int {
