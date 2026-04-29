@@ -18,9 +18,9 @@ Output:
 
 1. Handle degenerate case
 	If length(instance.Customers) = 0 then
-		Return Empty-Solution(cost = 0)  // empty instance is already solved
+		Return Empty-Solution(cost = 0)  
 	If instance.Vehicles = 0 then
-		Return Infeasible-Solution()  // non-empty instance without vehicles is infeasible
+		Return Infeasible-Solution()  
 2. Validate configuration and instance
 	Call Apply-Config-Defaults(cfg.BaseConfig)
 	If NOT Validate-Instance(instance) then

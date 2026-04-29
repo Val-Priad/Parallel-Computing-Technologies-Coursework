@@ -116,7 +116,6 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 				}
 			}
 
-			// local best stored if needed; removed unused `results` slice
 		}(w)
 	}
 
