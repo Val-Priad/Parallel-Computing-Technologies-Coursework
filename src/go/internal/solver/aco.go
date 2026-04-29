@@ -242,14 +242,10 @@ func depositSolution(pheromone [][]float64, solution vrp.Solution, amount float6
 		prev := 0
 		for _, node := range route.Nodes {
 			pheromone[prev][node] += amount
-
 			pheromone[node][prev] += amount
-
 			prev = node
 		}
-
 		pheromone[prev][0] += amount
-
 		pheromone[0][prev] += amount
 	}
 }
