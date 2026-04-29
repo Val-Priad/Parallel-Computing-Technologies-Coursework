@@ -8,8 +8,8 @@ Input:
 		MaxDemand: maximum customer demand
 		Vehicles: number of available vehicles
 		CapacityMode: policy for vehicle capacity (AUTO, TIGHT, LOOSE, FIXED)
-		CapacitySlack: slack multiplier for AUTO mode (default 1.15)
-		FixedCapacity: fixed capacity value (if mode = FIXED)
+		CapacitySlack: slack multiplier for AUTO mode 
+		FixedCapacity: fixed capacity value 
 		Seed: random seed for reproducibility
 Output:
 	points — collection of all nodes (depot at index 0, customers at indices 1 to NumCustomers)
@@ -20,7 +20,6 @@ Output:
 		VehicleCapacity: computed vehicle capacity
 		CapacityMode: capacity mode setting
 		Dist: n×n pairwise distance matrix
-
 1. Apply configuration defaults
 	Call Apply-Generator-Defaults(cfg)
 2. Initialize random number generator
@@ -80,7 +79,7 @@ Algorithm:
 				capacity ← cfg.FixedCapacity
 			Else:
 				Return max(max_demand, 1)
-		Case AUTO or default:
+		Case AUTO or unknown:
 			capacity ← ceil(total_demand × cfg.CapacitySlack / cfg.Vehicles)
 4. Apply feasibility constraints
 	capacity ← max(capacity, min_required)
@@ -115,23 +114,6 @@ Algorithm:
 	distance ← √[(a.x - b.x)² + (a.y - b.y)²]
 2. Return
 	Return distance
-
-Procedure Apply-Generator-Defaults(cfg):
-Input:
-	cfg — configuration object (modified in-place)
-Algorithm:
-1. Set seed to current time if not specified
-	If cfg.Seed = 0 then
-		cfg.Seed ← System-Time-Nanos()
-2. Apply demand constraints
-	If cfg.MinDemand ≤ 0 then cfg.MinDemand ← 1
-	If cfg.MaxDemand < cfg.MinDemand then cfg.MaxDemand ← cfg.MinDemand
-3. Apply coordinate bounds
-	If cfg.Width ≤ 0 then cfg.Width ← 100
-	If cfg.Height ≤ 0 then cfg.Height ← 100
-4. Apply capacity defaults
-	If cfg.CapacitySlack ≤ 0 then cfg.CapacitySlack ← 1.15
-	If cfg.CapacityMode = "" or undefined then cfg.CapacityMode ← AUTO
 
 Capacity Modes Explanation:
 1. TIGHT mode
