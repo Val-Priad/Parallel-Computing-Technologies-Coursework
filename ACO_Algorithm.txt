@@ -20,8 +20,10 @@ Output:
 	If no feasible solution exists, return solution with infinite cost
 
 1. Handle degenerate case
-	If length(instance.Customers) = 0 OR instance.Vehicles = 0 then
-		Return Infeasible-Solution()  // treat empty/zero-vehicle instance as infeasible (cost = +∞)
+	If length(instance.Customers) = 0 then
+		Return Empty-Solution(cost = 0)  // empty instance is already solved
+	If instance.Vehicles = 0 then
+		Return Infeasible-Solution()  // non-empty instance without vehicles is infeasible
 2. Validate input
 	Call Apply-Config-Defaults(cfg)
 	If NOT Validate-Instance(instance) then
@@ -153,7 +155,7 @@ Algorithm:
 	Return candidates[last]
 
 Notes:
-- Empty-instance handling: functions treat instances with zero customers or zero vehicles as infeasible and return a solution with infinite cost (+∞).
+- Empty-instance handling: functions treat zero-customer instances as solved with cost 0; non-empty instances with zero vehicles remain infeasible and return +∞.
 - Numerical stability: when distances are ≤ 0 use ε = 1e-9; when computed attraction weight ≤ 0 use ε = 1e-12.
 
 Function Nearest-Neighbor(current, candidates, dist):

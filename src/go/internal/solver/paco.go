@@ -18,7 +18,11 @@ type PACOConfig struct {
 func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	startTime := time.Now()
 
-	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
+	if len(instance.Customers) == 0 {
+		return solutionWithMetrics([]vrp.Route{}, 0, startTime)
+	}
+
+	if instance.Vehicles == 0 {
 		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
