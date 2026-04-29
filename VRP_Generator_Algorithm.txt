@@ -1,0 +1,166 @@
+Algorithm VRP Instance Generation
+Input:
+	cfg — configuration object containing:
+		NumCustomers: number of customer nodes to generate
+		Width: map width for coordinate space
+		Height: map height for coordinate space
+		MinDemand: minimum customer demand
+		MaxDemand: maximum customer demand
+		Vehicles: number of available vehicles
+		CapacityMode: policy for vehicle capacity (AUTO, TIGHT, LOOSE, FIXED)
+		CapacitySlack: slack multiplier for AUTO mode (default 1.15)
+		FixedCapacity: fixed capacity value (if mode = FIXED)
+		Seed: random seed for reproducibility
+Output:
+	points — collection of all nodes (depot at index 0, customers at indices 1 to NumCustomers)
+	instance — VRP instance object containing:
+		Depot: depot node (special node at map center)
+		Customers: array of customer nodes
+		Vehicles: number of available vehicles
+		VehicleCapacity: computed vehicle capacity
+		CapacityMode: capacity mode setting
+		Dist: n×n pairwise distance matrix
+
+1. Apply configuration defaults
+	Call Apply-Generator-Defaults(cfg)
+2. Initialize random number generator
+	rng ← Create-RNG(cfg.Seed)
+3. Create depot at the map center
+	depot ← point with id 0, zero demand, and coordinates (cfg.Width / 2, cfg.Height / 2)
+	nodes ← collection containing depot
+4. Generate customer nodes and collect demand statistics
+	total_demand ← 0
+	max_demand ← 0
+	For i = 1 to cfg.NumCustomers do
+		demand ← Random-Int(cfg.MinDemand, cfg.MaxDemand, rng)
+		x ← Random-Float(0, cfg.Width, rng)
+		y ← Random-Float(0, cfg.Height, rng)
+
+		total_demand ← total_demand + demand
+		If demand > max_demand then
+			max_demand ← demand
+
+		add point(id = i, x = x, y = y, demand = demand) to nodes
+5. Compute vehicle capacity
+	capacity ← Compute-Capacity(cfg, total_demand, max_demand)
+6. Build distance matrix
+	dist ← Build-Distance-Matrix(nodes)
+7. Assemble VRP instance
+	instance ← object with:
+		Depot = nodes[0]
+		Customers = nodes without the depot
+		Vehicles = cfg.Vehicles
+		VehicleCapacity = capacity
+		CapacityMode = cfg.CapacityMode
+		Dist = dist
+8. Return result
+	Return (nodes, instance)
+
+Function Compute-Capacity(cfg, total_demand, max_demand):
+Input:
+	cfg — configuration with capacity mode and parameters
+	total_demand — sum of all customer demands
+	max_demand — largest single customer demand
+Output:
+	capacity — computed vehicle capacity (≥ max_demand)
+Algorithm:
+1. Handle edge cases
+	If total_demand ≤ 0 then Return 1
+	If cfg.Vehicles ≤ 0 then Return max(max_demand, 1)
+2. Compute minimum capacity for equal distribution
+	min_required ← ceil(total_demand / cfg.Vehicles)
+3. Select capacity by policy
+	Switch cfg.CapacityMode:
+		Case TIGHT:
+			capacity ← min_required
+		Case LOOSE:
+			capacity ← max(total_demand, max_demand)
+		Case FIXED:
+			If cfg.FixedCapacity > 0 then
+				capacity ← cfg.FixedCapacity
+			Else:
+				Return max(max_demand, 1)
+		Case AUTO or default:
+			capacity ← ceil(total_demand × cfg.CapacitySlack / cfg.Vehicles)
+4. Apply feasibility constraints
+	capacity ← max(capacity, min_required)
+	capacity ← max(capacity, max_demand)
+5. Return valid capacity
+	Return max(capacity, 1)
+
+Function Build-Distance-Matrix(nodes):
+Input:
+	nodes — array of n points, each with coordinates (x, y)
+Output:
+	dist — n×n distance matrix where dist[i][j] = Euclidean distance between nodes[i] and nodes[j]
+Algorithm:
+1. Get matrix size
+	n ← length(nodes)
+2. Initialize n×n distance matrix
+	dist ← n×n matrix of zeros
+3. Fill pairwise distances
+	For i = 0 to n-1:
+		For j = 0 to n-1:
+			dist[i][j] ← Distance(nodes[i], nodes[j])
+4. Return matrix
+	Return dist
+
+Function Distance(a, b):
+Input:
+	a, b — points with coordinates (x, y)
+Output:
+	distance — Euclidean distance
+Algorithm:
+1. Compute distance
+	distance ← √[(a.x - b.x)² + (a.y - b.y)²]
+2. Return
+	Return distance
+
+Procedure Apply-Generator-Defaults(cfg):
+Input:
+	cfg — configuration object (modified in-place)
+Algorithm:
+1. Set seed to current time if not specified
+	If cfg.Seed = 0 then
+		cfg.Seed ← System-Time-Nanos()
+2. Apply demand constraints
+	If cfg.MinDemand ≤ 0 then cfg.MinDemand ← 1
+	If cfg.MaxDemand < cfg.MinDemand then cfg.MaxDemand ← cfg.MinDemand
+3. Apply coordinate bounds
+	If cfg.Width ≤ 0 then cfg.Width ← 100
+	If cfg.Height ≤ 0 then cfg.Height ← 100
+4. Apply capacity defaults
+	If cfg.CapacitySlack ≤ 0 then cfg.CapacitySlack ← 1.15
+	If cfg.CapacityMode = "" or undefined then cfg.CapacityMode ← AUTO
+
+Capacity Modes Explanation:
+1. TIGHT mode
+	- Capacity is the minimum required to distribute totalDemand equally
+	- Formula: capacity = ( totalDemand / vehicles )
+	- Results in tight constraints, tests solver's ability to handle tight packing
+	- Most challenging for heuristics
+2. LOOSE mode
+	- Capacity is set to maximum possible value among max(totalDemand, maxDemand)
+	- Tests solver behavior with relaxed constraints
+	- Fewer routing conflicts, higher feasibility
+3. FIXED mode
+	- User specifies exact capacity value via cfg.FixedCapacity
+	- Ensures consistent problem instances across runs
+	- Useful for controlled experimentation
+4. AUTO mode
+	- Capacity computed with auto multiplier: ( totalDemand × auto / vehicles )
+	- Interpolates between TIGHT and LOOSE based on auto coefficient
+	- Example: auto = 1.2 provides 20% extra capacity beyond tight minimum
+Instance Validation Checklist:
+1. All customers must have positive demand: ∀c ∈ customers: c.demand > 0
+2. Vehicle capacity must accommodate largest customer: capacity ≥ maxDemand
+3. Distance matrix must be symmetric: dist[i][j] = dist[j][i]
+4. All distances must be non-negative: dist[i][j] ≥ 0
+5. Depot must have zero demand: depot.demand = 0
+6. Number of customers must match: length(instance.customers) = cfg.NumCustomers
+7. Number of vehicles must be positive: instance.vehicles > 0
+8. Coordinates must be within bounds: 0 ≤ x ≤ cfg.Width AND 0 ≤ y ≤ cfg.Height
+
+Notes:
+- Empty-instance handling: solvers treat instances with zero customers or zero vehicles as infeasible and return a solution with infinite cost (+∞).
+- Numerical stability: distance computations should guard against zero/near-zero distances when used as denominators (suggested ε = 1e-9).

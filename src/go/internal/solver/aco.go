@@ -70,11 +70,7 @@ func SolveACO(instance vrp.VRPInstance, logger *logging.Logger, cfg ACOConfig) v
 	startTime := time.Now()
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
-		return vrp.Solution{
-			Routes:     []vrp.Route{},
-			Cost:       0,
-			DurationMS: float64(time.Since(startTime).Milliseconds()),
-		}
+		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
 	applyConfigDefaults(&cfg)
@@ -294,7 +290,7 @@ func buildSolution(
 ) (vrp.Solution, bool) {
 	n := len(instance.Dist)
 	if n == 0 {
-		return vrp.Solution{Routes: []vrp.Route{}, Cost: 0}, true
+		return vrp.Solution{Routes: []vrp.Route{}, Cost: math.Inf(1)}, false
 	}
 
 	for i := 0; i < n; i++ {

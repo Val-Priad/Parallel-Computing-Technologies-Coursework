@@ -19,11 +19,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	startTime := time.Now()
 
 	if len(instance.Customers) == 0 || instance.Vehicles == 0 {
-		return vrp.Solution{
-			Routes:     []vrp.Route{},
-			Cost:       0,
-			DurationMS: float64(time.Since(startTime).Milliseconds()),
-		}
+		return solutionWithMetrics([]vrp.Route{}, math.Inf(1), startTime)
 	}
 
 	applyConfigDefaults(&cfg.BaseConfig)
@@ -34,11 +30,6 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 	cfg.NumWorkers = resolvePACOWorkers(cfg.NumWorkers, cfg.BaseConfig.NumAnts)
 	cfg.NumExchanges = resolveExchangesQty(cfg.NumExchanges)
 
-	type result struct {
-		best vrp.Solution
-	}
-
-	results := make([]result, cfg.NumWorkers)
 	antsPerWorker := splitAnts(cfg.BaseConfig.NumAnts, cfg.NumWorkers)
 
 	var wg sync.WaitGroup
@@ -121,7 +112,7 @@ func SolvePACO(instance vrp.VRPInstance, cfg PACOConfig) vrp.Solution {
 				}
 			}
 
-			results[workerID] = result{best: best}
+			// local best stored if needed; removed unused `results` slice
 		}(w)
 	}
 

@@ -1,0 +1,323 @@
+Algorithm Ant Colony Optimization (ACO)
+Input:
+	instance — VRP instance containing:
+		Customers: collection of customer nodes with demands
+		Dist: n×n distance matrix
+		Vehicles: number of available vehicles
+		VehicleCapacity: vehicle capacity constraint
+	cfg — configuration object containing:
+		NumAnts: number of ants per iteration
+		Iterations: maximum number of iterations
+		Alpha: pheromone importance (α)
+		Beta: heuristic importance (β)
+		Evaporation: pheromone evaporation rate (∈ [0, 1])
+		Q: pheromone scaling factor
+		InitialPheromone: initial pheromone value
+		EliteWeight: weight for elite reinforcement
+		Seed: random seed for reproducibility
+Output:
+	solution — best feasible solution found with routes and cost
+	If no feasible solution exists, return solution with infinite cost
+
+1. Handle degenerate case
+	If length(instance.Customers) = 0 OR instance.Vehicles = 0 then
+		Return Infeasible-Solution()  // treat empty/zero-vehicle instance as infeasible (cost = +∞)
+2. Validate input
+	Call Apply-Config-Defaults(cfg)
+	If NOT Validate-Instance(instance) then
+		Return Infeasible-Solution()
+3. Initialize state
+	n ← length(instance.Dist)
+	pheromone ← Initialize-Pheromone(n, cfg.InitialPheromone)
+	rng ← Create-RNG(cfg.Seed)
+	best_solution ← Infeasible-Solution()
+4. Repeat for the configured number of iterations
+	For iter = 0 to cfg.Iterations - 1 do
+		constructed_solutions ← empty list
+		For ant = 0 to cfg.NumAnts - 1 do
+			candidate, feasible ← Build-Solution(instance, pheromone, cfg, rng)
+			add candidate to constructed_solutions
+			If feasible AND candidate.cost < best_solution.cost then
+				best_solution ← Clone-Solution(candidate)
+
+		Call Evaporate(pheromone, cfg.Evaporation)
+
+		For each solution in constructed_solutions do
+			If solution.cost > 0 then
+				amount ← cfg.Q / solution.cost
+				Call Deposit-Solution(pheromone, solution, amount)
+
+		If best_solution.cost < +∞ AND best_solution.cost > 0 then
+			elite_amount ← cfg.EliteWeight × cfg.Q / best_solution.cost
+			Call Deposit-Solution(pheromone, best_solution, elite_amount)
+5. Return the best feasible solution found
+	If best_solution.cost = +∞ then
+		Return Infeasible-Solution()
+	Return best_solution
+
+Function Build-Solution(instance, τ, cfg, rng):
+Input:
+	instance — VRP instance
+	τ — pheromone matrix
+	cfg — algorithm configuration
+	rng — random number generator
+Output:
+	solution — constructed solution with routes
+	feasible — boolean indicating feasibility
+Algorithm:
+1. Initialize tracking structures
+	visited ← set of visited customer indices (initially empty)
+	remaining ← length(instance.Customers)
+2. Construct routes sequentially
+	routes ← []
+	While remaining > 0 AND length(routes) < instance.Vehicles do
+		2.1 Initialize new route
+			route ← empty sequence
+			load ← 0
+			current ← 0 (depot index)
+		2.2 Extend route while feasible customers exist
+			While true do
+				2.2.1 Identify candidate customers
+					candidates ← {c.id : c ∈ instance.Customers, c.id ∉ visited, load + c.demand ≤ instance.VehicleCapacity}
+				2.2.2 Check if candidates exist
+					If candidates = ∅ then
+						Break
+				2.2.3 Select next customer using heuristic-probabilistic rule
+					next ← Select-Next(current, candidates, instance.Dist, τ, cfg, rng)
+					If next = null then
+						Break
+				2.2.4 Update route and state
+					add next to route
+					load ← load + Demand(next)
+					current ← next
+					visited ← visited ∪ {next}
+					remaining ← remaining - 1
+		2.3 Finalize and add route
+				add route to routes
+3. Check feasibility
+	If remaining > 0 then
+		Return (null, false)
+4. Pad to vehicle count
+	While length(routes) < instance.Vehicles do
+			add empty-route to routes
+5. Compute total cost
+	cost ← Sum-Route-Costs(routes, instance.Dist)
+6. Return solution
+	Return ((routes, cost), true)
+
+Function Select-Next(current, candidates, dist, τ, cfg, rng):
+Input:
+	current — current node index
+	candidates — set/array of candidate customer indices
+	dist — distance matrix
+	τ — pheromone matrix
+	cfg — algorithm configuration with Alpha, Beta parameters
+	rng — random number generator
+Output:
+	next — selected customer index, or null if none available
+Algorithm:
+1. Handle trivial cases
+	If length(candidates) = 0 then
+		Return null
+	If length(candidates) = 1 then
+		Return candidates[0]
+2. Compute attraction weights using pheromone-heuristic rule
+	weights ← empty collection
+	total_weight ← 0
+	For each j in candidates do
+		2.1 Compute distance-based heuristic
+			d_ij ← dist[current][j]
+			If d_ij ≤ 0 then
+				d_ij ← ε (small constant for numerical stability)
+		2.2 Compute pheromone and heuristic components
+			τ_ij ← τ[current][j]
+			η_ij ← 1 / d_ij
+		2.3 Compute attraction weight: w = (τ_ij)^α × (η_ij)^β
+			w ← (τ_ij)^cfg.Alpha × (η_ij)^cfg.Beta
+			If w ≤ 0 then
+				w ← ε (prevent zero weight; implementation uses ε = 1e-12)
+		2.4 Accumulate weight
+			add w to weights
+			total_weight ← total_weight + w
+3. Handle degenerate case (all weights ≤ 0)
+	If total_weight ≤ 0 then
+		Return Nearest-Neighbor(current, candidates, dist)
+4. Roulette-wheel selection (probabilistic)
+	r ← RandomFloat(0, total_weight, rng)
+	accumulated ← 0
+	For i = 0 to length(candidates) - 1 do
+		accumulated ← accumulated + weights[i]
+		If r ≤ accumulated then
+			Return candidates[i]
+5. Fallback (numerical precision edge case)
+	Return candidates[last]
+
+Notes:
+- Empty-instance handling: functions treat instances with zero customers or zero vehicles as infeasible and return a solution with infinite cost (+∞).
+- Numerical stability: when distances are ≤ 0 use ε = 1e-9; when computed attraction weight ≤ 0 use ε = 1e-12.
+
+Function Nearest-Neighbor(current, candidates, dist):
+Input:
+	current — current node index
+	candidates — array of candidate customer indices
+	dist — distance matrix
+Output:
+	next — closest candidate index
+Algorithm:
+1. Initialize with first candidate
+	best_node ← candidates[0]
+	best_dist ← dist[current][best_node]
+2. Find closest candidate
+	For i = 1 to length(candidates) - 1 do
+		node ← candidates[i]
+		If dist[current][node] < best_dist then
+			best_dist ← dist[current][node]
+			best_node ← node
+3. Return closest
+	Return best_node
+
+Procedure Evaporate(pheromone, rate):
+Input:
+	pheromone — n×n pheromone matrix (modified in place)
+	rate — evaporation rate in [0, 1]
+Algorithm:
+1. Compute evaporation multiplier
+	n ← length(pheromone)
+	factor ← 1 - rate
+2. Apply uniform evaporation to all edges
+	For i = 0 to n - 1 do
+		For j = 0 to n - 1 do
+			If i = j then
+				pheromone[i][j] ← 0
+			Else
+				pheromone[i][j] ← pheromone[i][j] × factor
+
+Procedure Deposit-Solution(pheromone, solution, amount):
+Input:
+	pheromone — n×n pheromone matrix (modified in place)
+	solution — solution object containing routes
+	amount — amount of pheromone to deposit per edge
+Algorithm:
+1. Reinforce each traversed edge symmetrically
+	For each route in solution.routes do
+		1.1 Skip empty routes
+			If route.nodes = [] then continue
+		1.2 Process route edges (depot → first node)
+			prev ← 0
+		1.3 Deposit pheromone along route
+			For each node in route.nodes do
+				pheromone[prev][node] ← pheromone[prev][node] + amount
+				pheromone[node][prev] ← pheromone[node][prev] + amount
+				prev ← node
+		1.4 Close route (last node → depot)
+			pheromone[prev][0] ← pheromone[prev][0] + amount
+			pheromone[0][prev] ← pheromone[0][prev] + amount
+
+Function Compute-Total-Cost(routes, dist):
+Input:
+	routes — array of routes
+	dist — distance matrix
+Output:
+	total_cost — sum of all route costs
+Algorithm:
+1. Initialize accumulator
+	total_cost ← 0
+2. Sum cost of each route
+	For each route in routes do
+		If route is not empty then
+			total_cost ← total_cost + Compute-Route-Cost(route, dist)
+3. Return total
+	Return total_cost
+
+Function Compute-Route-Cost(route, dist):
+Input:
+	route — ordered sequence of customer indices
+	dist — distance matrix
+Output:
+	cost — total distance traveled (depot → route → depot)
+Algorithm:
+1. If route is empty, cost is zero
+	If length(route) = 0 then
+		Return 0
+2. Traverse from depot to all customers and back
+	cost ← 0
+	prev ← 0 (depot)
+	For each node in route do
+		cost ← cost + dist[prev][node]
+		prev ← node
+	cost ← cost + dist[prev][0] (return to depot)
+3. Return cost
+	Return cost
+
+Function Clone-Solution(solution):
+Input:
+	solution — solution object with routes and cost
+Output:
+	cloned — deep copy of solution
+Algorithm:
+1. Create new solution with cloned routes
+	cloned_routes ← Clone each route from solution
+	Return (cloned_routes, cost: solution.cost)
+
+Procedure Apply-Config-Defaults(cfg):
+Input:
+	cfg — configuration object (modified in-place)
+Algorithm:
+1. Set defaults for uninitialized parameters
+	If cfg.NumAnts ≤ 0: cfg.NumAnts ← 80
+	If cfg.Iterations ≤ 0: cfg.Iterations ← 500
+	If cfg.Alpha ≤ 0: cfg.Alpha ← 1.0
+	If cfg.Beta ≤ 0: cfg.Beta ← 3.5
+	If cfg.Evaporation ≤ 0 or ≥ 1: cfg.Evaporation ← 0.15
+	If cfg.Q ≤ 0: cfg.Q ← 100.0
+	If cfg.InitialPheromone ≤ 0: cfg.InitialPheromone ← 0.50
+	If cfg.EliteWeight < 0: cfg.EliteWeight ← 3.0
+	If cfg.Seed = 0: cfg.Seed ← System-Random-Seed()
+
+Function Validate-Instance(instance):
+Input:
+	instance — VRP instance
+Output:
+	valid — true if instance is structurally valid
+Algorithm:
+1. Check instance structure
+	n ← length(instance.Dist)
+	If n = 0: return (length(instance.Customers) = 0)
+2. Validate each customer
+	seen ← empty set
+	For each customer c in instance.Customers do
+		If c.id < 0 or c.id ≥ n: return false
+		If c.id in seen: return false (duplicate id)
+		If c.demand > instance.VehicleCapacity: return false
+		seen ← seen ∪ {c.id}
+3. All checks passed
+	Return true
+
+Function Initialize-Pheromone(n, initial_value):
+Input:
+	n — size of square matrix
+	initial_value — pheromone value for non-diagonal elements
+Output:
+	τ — n×n pheromone matrix with diagonal = 0
+Algorithm:
+1. Create n×n matrix
+	τ ← empty n×n matrix
+2. Initialize: diagonal to 0, others to initial_value
+	For i = 0 to n-1:
+		For j = 0 to n-1:
+			If i = j: τ[i][j] ← 0
+			Else: τ[i][j] ← initial_value
+3. Return matrix
+	Return τ
+
+Function Create-RNG(seed):
+Input:
+	seed — seed value for reproducibility
+Output:
+	rng — initialized random number generator
+Algorithm:
+1. Create and seed generator
+	If seed = 0: seed ← System-Time()
+	rng ← Initialize-Random-Generator(seed)
+2. Return generator
+	Return rng
