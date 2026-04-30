@@ -49,7 +49,7 @@ func RunPACOProcessTuning() {
 
 	baseCfg := solver.DefaultACOConfig()
 
-	for workers := 1; workers <= 50; workers++ {
+	for workers := 1; workers <= 40; workers++ {
 		fmt.Printf("workers=%d...\n", workers)
 
 		runCfg := solver.PACOConfig{

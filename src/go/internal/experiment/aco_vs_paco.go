@@ -72,7 +72,7 @@ func RunACOvsPACO() {
 			acoTotalCost += acoSolution.Cost
 			acoTotalDuration += acoSolution.DurationMS
 
-			pacoCfg := solver.PACOConfig{BaseConfig: solver.DefaultACOConfig()}
+			pacoCfg := solver.PACOConfig{BaseConfig: solver.DefaultACOConfig(), NumWorkers: 16}
 			pacoCfg.BaseConfig.Seed = seed
 			pacoSolution := solver.SolvePACO(instance, pacoCfg)
 			pacoTotalCost += pacoSolution.Cost
