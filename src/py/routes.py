@@ -94,6 +94,20 @@ def visualize(data, name):
     plt.close(fig)
 
 
+def visualize_problem(points, name):
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    plot_points(ax, points)
+
+    ax.set_title(f"VRP Problem\n{name}")
+    ax.set_aspect("equal")
+    ax.grid(True)
+
+    output_path = SOLUTIONS_DIR / f"{name}.png"
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+
+
 def main():
     files = sorted(LOGS_DIR.glob("*.json"))
     SOLUTIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -104,6 +118,9 @@ def main():
     for f in files:
         with open(f, encoding="utf-8") as fp:
             data = json.load(fp)
+
+        points = {int(k): v for k, v in data["points"].items()}
+        visualize_problem(points, Path(f.name).stem + "_problem")
 
         visualize(data, f.name)
 

@@ -15,7 +15,6 @@ Input:
 Output:
 	solution — best feasible solution shared via global_best during periodic exchanges
 	If no feasible solution exists, return solution with infinite cost
-
 1. Handle degenerate case
 	If length(instance.Customers) = 0 then
 		Return Empty-Solution(cost = 0)  
@@ -98,37 +97,6 @@ Algorithm:
 			distribution[i] ← distribution[i] + 1
 3. Return distribution
 	Return distribution
-
-Function Normalize-Worker-Count(requested, available_ants):
-Input:
-	requested — user-specified worker count (0 means auto)
-	available_ants — number of ants for distribution
-Output:
-	normalized — valid worker count
-Algorithm:
-1. Auto-detect if not specified
-	If requested ≤ 0 then
-		requested ← Number-Of-CPUs()
-2. Cap by available ants
-	If requested > available_ants then
-		requested ← available_ants
-3. Ensure at least 1
-	If requested ≤ 0 then
-		requested ← 1
-4. Return
-	Return requested
-
-Function Resolve-Exchanges-Count(requested):
-Input:
-	requested — user-specified number of exchange checkpoints
-Output:
-	normalized — valid exchange checkpoints count
-Algorithm:
-1. Apply default for invalid input
-	If requested ≤ 0 then
-		Return 10
-2. Return provided value
-	Return requested
 
 Information Exchange Pattern:
 1. Exchange interval calculation:
