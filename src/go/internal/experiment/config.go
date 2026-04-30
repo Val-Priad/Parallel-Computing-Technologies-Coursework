@@ -40,15 +40,15 @@ func generateExperiments(
 
 func GetExperiments() []ExperimentConfig {
 	return generateExperiments(
-		1,
-		8,
+		3,
+		4,
 		2,
-		func(i int) int { return 3 + (i+1)/2 },
+		func(i int) int { return 2 + (i+1)/2 },
 		func(i int) float64 {
 			if i == 0 {
-				return 80
+				return 50
 			}
-			return float64(60 + i*20)
+			return float64(40 + i*20)
 		},
 		vrp.CapacityTight,
 		67,
