@@ -1,5 +1,9 @@
 # Parallel ACO for Vehicle Routing Problem
 
+This project implements sequential and parallel Ant Colony Optimization algorithms for solving the Vehicle Routing Problem.
+
+It compares brute force search, sequential ACO, and parallel ACO using generated VRP instances, CSV reports, JSON route logs, and Python visualizations.
+
 ## ⚙️ Technologies
 
 [![Technologies](https://skillicons.dev/icons?i=go,python&perline=5)](https://skillicons.dev)
@@ -9,6 +13,36 @@
 - Matplotlib
 - CSV
 - JSON
+
+## 📝 Project Background
+
+I developed this project as my coursework for the subject **Parallel Computing Technologies**.
+
+I first encountered the Ant Colony Optimization algorithm during my second year of university. At that time, it seemed extremely complex to me, both conceptually and mathematically. In my third year, I had the opportunity to return to this topic, study it more deeply, and finally understand how the algorithm works in practice.
+
+### Why Ant Colony Optimization
+
+The main idea of the project was to implement and analyze the Ant Colony Optimization algorithm for solving the Vehicle Routing Problem. I wanted not only to reproduce the algorithm, but also to understand its internal logic: pheromone updates, heuristic influence, evaporation, route construction, and solution improvement over multiple iterations.
+
+To be honest, the mathematical part was the most challenging aspect for me. I understood the general principles of the algorithm, but some of the formulas were difficult to keep fully in my head. Because of that, I worked with scientific articles and other academic sources while implementing the project. In the written coursework report, I explained the theoretical background, the formulas, and the reasoning behind the algorithm in more detail.
+
+### Why I Chose Go
+
+For the implementation, I chose **Go** deliberately. There were many possible options, such as Python, CUDA, Java, C#, C++, and others. However, Go seemed like the best choice for this project because of its simplicity, strong performance, and built-in support for concurrency through goroutines.
+
+This project also helped me understand why Go is often described as a simpler and more lightweight alternative to C++. I really enjoyed how direct and practical the language feels. Its concurrency model made it much easier to experiment with parallel execution and worker-based computation.
+
+### What I Learned
+
+During this project, I gained a much deeper understanding of Ant Colony Optimization and parallel algorithm design. I learned how to split computation between multiple workers, synchronize shared data, exchange the best solution between goroutines, and measure the performance difference between sequential and parallel implementations.
+
+The main goal was to speed up the sequential version of the algorithm by implementing a parallel version. As a result, I was able to achieve a noticeable performance improvement while preserving the quality of the solution.
+
+### Result
+
+Overall, I am satisfied with this project. It was difficult, but I put a lot of effort into understanding the algorithm, implementing it correctly, and analyzing the results. This coursework helped me improve both my knowledge of parallel computing and my practical experience with Go.
+
+Most importantly, this project made me realize that I really enjoy working with Go. I like its simplicity, its performance, and the way it handles concurrency. Because of this project, I became much more confident in using Go for algorithmic and performance-oriented tasks.
 
 ## 🧠 What I Learned
 
@@ -237,7 +271,7 @@ These plots show:
 ### PACO worker scaling plots
 
 ```bash
-python src/py/paco_tunning.py
+python src/py/paco_tuning.py
 ```
 
 Input:
@@ -249,8 +283,8 @@ src/go/results/paco_process_tuning.csv
 Output:
 
 ```text
-src/py/results/paco_tunning/cost_vs_workers.png
-src/py/results/paco_tunning/speedup.png
+src/py/results/paco_tuning/cost_vs_workers.png
+src/py/results/paco_tuning/speedup.png
 ```
 
 These plots show how the number of workers affects PACO speed and solution quality.
@@ -291,7 +325,7 @@ cd ../..
 python src/py/brute_vs_aco.py
 python src/py/aco.py
 python src/py/aco_vs_paco.py
-python src/py/paco_tunning.py
+python src/py/paco_tuning.py
 python src/py/routes.py
 ```
 
@@ -322,24 +356,25 @@ python src/py/routes.py
 
 ```text
 .
-├── go
-│   ├── cmd
-│   │   ├── aco_experiment
-│   │   ├── aco_vs_paco
-│   │   ├── brute_vs_aco
-│   │   ├── tune_aco
-│   │   └── tune_paco
-│   └── internal
-│       ├── experiment
-│       ├── logging
-│       ├── solver
-│       └── vrp
-└── py
-    ├── aco.py
-    ├── aco_vs_paco.py
-    ├── brute_vs_aco.py
-    ├── paco_tunning.py
-    └── routes.py
+└── src
+    ├── go
+    │   ├── cmd
+    │   │   ├── aco_experiment
+    │   │   ├── aco_vs_paco
+    │   │   ├── brute_vs_aco
+    │   │   ├── tune_aco
+    │   │   └── tune_paco
+    │   └── internal
+    │       ├── experiment
+    │       ├── logging
+    │       ├── solver
+    │       └── vrp
+    └── py
+        ├── aco.py
+        ├── aco_vs_paco.py
+        ├── brute_vs_aco.py
+        ├── paco_tuning.py
+        └── routes.py
 ```
 
 ## 📌 Results
